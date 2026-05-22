@@ -1,0 +1,22 @@
+# Frontend
+studentms-frontend/node_modules/
+studentms-frontend/dist/
+studentms-frontend/.env
+studentms-frontend/.env.local
+
+# Backend
+studentms-backend/target/
+studentms-backend/.mvn/
+studentms-backend/mvnw
+studentms-backend/mvnw.cmd
+studentms-backend/*.log
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
