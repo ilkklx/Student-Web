@@ -2,6 +2,7 @@ package com.sms.studentms_backend.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sms.studentms_backend.dto.StudentDTO;
+import com.sms.studentms_backend.exception.StudentNotFoundException;
 import com.sms.studentms_backend.service.StudentService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -57,7 +58,8 @@ class StudentControllerTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void getStudentById_WhenNotFound_ShouldReturn404() throws Exception {
-        when(studentService.getStudentById(99L)).thenThrow(new RuntimeException("Student not found"));
+        // 模拟真实业务层会抛出的异常，验证它被转换为 HTTP 404。
+        when(studentService.getStudentById(99L)).thenThrow(new StudentNotFoundException(99L));
 
         mockMvc.perform(get("/api/students/99"))
                 .andExpect(status().isNotFound());
