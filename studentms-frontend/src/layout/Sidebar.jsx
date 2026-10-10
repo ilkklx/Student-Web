@@ -54,6 +54,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, shell, mobileOpen
 
   const adminLinks = []
   if (canAdminActions) {
+    adminLinks.push({ to: '/admin/accounts', label: '账号管理', icon: UserIcon })
     adminLinks.push({ to: '/admin/recycle', label: 'Recycle bin', icon: TrashIcon })
     adminLinks.push({ to: '/export', label: 'Export', icon: ArrowDownTrayIcon })
   }

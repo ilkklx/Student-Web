@@ -20,4 +20,10 @@ public class DashboardController {
     public DashboardStatsDTO getStats() {
         return dashboardService.getDashboardStats();
     }
+
+    @GetMapping("/teacher")
+    @PreAuthorize("hasRole('TEACHER')")
+    public DashboardStatsDTO getTeacherStats(org.springframework.security.core.Authentication authentication) {
+        return dashboardService.getTeacherStats(authentication.getName());
+    }
 }

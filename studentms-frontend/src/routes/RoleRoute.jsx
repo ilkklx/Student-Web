@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 export default function RoleRoute({ roles, children }) {
   const { roleName } = useAuth()
   if (!roles.includes(roleName)) {
-    return <Navigate to="/dashboard" replace />
+    return <Navigate to="/" replace />
   }
   return children
 }

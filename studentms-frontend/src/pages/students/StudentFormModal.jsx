@@ -8,6 +8,7 @@ const schema = yup.object({
   name: yup.string().trim().min(2, 'Min 2 characters').max(100).required('Name is required'),
   email: yup.string().trim().email('Valid email required').required('Email is required'),
   department: yup.string().trim().required('Department is required'),
+  studentNumber: yup.string().trim().matches(/^[0-9]{6,32}$/, { message: '学号须为 6–32 位数字', excludeEmptyString: true }),
 })
 
 export default function StudentFormModal({ open, mode, initial, onClose, onSubmit }) {
@@ -18,7 +19,7 @@ export default function StudentFormModal({ open, mode, initial, onClose, onSubmi
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: yupResolver(schema),
-    defaultValues: { name: '', email: '', department: '' },
+    defaultValues: { name: '', email: '', department: '', studentNumber: '' },
   })
 
   useEffect(() => {
@@ -27,11 +28,12 @@ export default function StudentFormModal({ open, mode, initial, onClose, onSubmi
       name: initial?.name || '',
       email: initial?.email || '',
       department: initial?.department || '',
+      studentNumber: initial?.studentNumber || '',
     })
   }, [open, initial, reset])
 
   const submit = handleSubmit(async (values) => {
-    await onSubmit(values)
+    await onSubmit({ ...values, studentNumber: values.studentNumber || null })
   })
 
   return (
@@ -61,6 +63,8 @@ export default function StudentFormModal({ open, mode, initial, onClose, onSubmi
       }
     >
       <form className="space-y-4" onSubmit={submit}>
+        <label className="block text-sm text-slate-700 dark:text-slate-300">学号（可选）<input className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 dark:border-white/15 dark:bg-slate-950" {...register('studentNumber')} /></label>
+        {errors.studentNumber && <p className="text-xs text-rose-500">{errors.studentNumber.message}</p>}
         <div>
           <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300" htmlFor="sf-name">
             Name

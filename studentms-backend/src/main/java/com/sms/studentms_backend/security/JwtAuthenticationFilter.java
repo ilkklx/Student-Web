@@ -30,9 +30,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     FilterChain filterChain) throws ServletException, IOException {
 
         final String authHeader = request.getHeader("Authorization");
+        String requestPath = request.getRequestURI().substring(request.getContextPath().length());
+        if (requestPath.equals("/api/auth/login") || requestPath.equals("/api/auth/register/student")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
         String token = null;
         String username = null;
 
+        try {
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             token = authHeader.substring(7);
             username = jwtUtil.extractUsername(token);
@@ -46,6 +52,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authToken);
             }
+        }
+        } catch (io.jsonwebtoken.JwtException | IllegalArgumentException | org.springframework.security.core.AuthenticationException ex) {
+            SecurityContextHolder.clearContext();
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid or expired session");
+            return;
         }
         filterChain.doFilter(request, response);
     }

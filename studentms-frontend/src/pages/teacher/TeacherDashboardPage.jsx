@@ -7,11 +7,10 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import Spinner from '../../components/ui/Spinner'
 import { getApiErrorMessage } from '../../lib/errors'
-import { getDashboardStats } from '../../lib/dashboardApi'
-import { queryKeys } from '../../lib/queryKeys'
+import api from '../../lib/api'
 
 export default function TeacherDashboardPage() {
-  const q = useQuery({ queryKey: queryKeys.dashboardStats, queryFn: getDashboardStats })
+  const q = useQuery({ queryKey: ['teacherStats'], queryFn: async () => (await api.get('/dashboard/teacher')).data })
 
   if (q.isPending) {
     return (
@@ -21,36 +20,15 @@ export default function TeacherDashboardPage() {
     )
   }
 
-  if (q.isError) {
-    return (
-      <div className="space-y-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Teacher Dashboard</h1>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Manage your classes and students.</p>
-        </div>
-        <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-5 text-sm text-amber-800 dark:text-amber-50">
-          <div className="font-semibold">Welcome, Teacher</div>
-          <div className="mt-2">Use the menu to view your roster, courses, and enrollments.</div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Link to="/teacher/roster" className="rounded-xl bg-teal-600 px-4 py-2 text-xs font-semibold text-white hover:bg-teal-500 dark:bg-teal-600 dark:hover:bg-teal-500">
-              Class Roster
-            </Link>
-            <Link to="/courses" className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10">
-              Browse Courses
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-  
+  if (q.isError) return <p role="alert">{getApiErrorMessage(q.error)}</p>
+
   const d = q.data
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Teacher dashboard</h1>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Snapshot metrics (same endpoint as admin dashboard).</p>
+        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">仅统计本人任教课程及其有效选课学生。</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">

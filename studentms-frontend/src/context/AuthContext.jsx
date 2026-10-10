@@ -1,86 +1,67 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react'
-import { loginRequest, registerRequest } from '../lib/authApi'
-import {
-  clearSession,
-  getStoredRole,
-  getStoredUsername,
-  getToken,
-  setSession,
-} from '../lib/authStorage'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { loginRequest } from '../lib/authApi'
+import api from '../lib/api'
+import { clearSession, getToken, setSession } from '../lib/authStorage'
 
 const AuthContext = createContext(null)
 
-function parseRegisterMessage(data) {
-  if (data == null) return 'Registered.'
-  if (typeof data === 'string') return data
-  if (typeof data === 'object' && 'message' in data) return String(data.message)
-  return 'User registered successfully'
-}
-
 export function AuthProvider({ children }) {
+  const qc = useQueryClient()
   const [token, setToken] = useState(getToken)
-  const [username, setUsername] = useState(getStoredUsername)
-  const [roleName, setRoleName] = useState(getStoredRole)
+  const [identity, setIdentity] = useState(null)
+  const [isHydrating, setIsHydrating] = useState(Boolean(getToken()))
+  const [identityError, setIdentityError] = useState(null)
 
-  const isAuthenticated = Boolean(token)
+  useEffect(() => {
+    if (!token) return
+    let active = true
+    api.get('/auth/me').then(({ data }) => {
+      if (active) {
+        setIdentity(data)
+        setIdentityError(null)
+        setSession({ username: data.username, roleName: data.roleName, linkedStudentId: null })
+      }
+    }).catch((error) => {
+      if (!active) return
+      setIdentityError(error)
+      if (error.response?.status === 401) {
+        clearSession()
+        setToken(null)
+        setIdentity(null)
+        qc.clear()
+      }
+    }).finally(() => { if (active) setIsHydrating(false) })
+    return () => { active = false }
+  }, [token, qc])
 
-  const login = useCallback(async ({ username: u, password }) => {
-    const data = await loginRequest({ username: u, password })
-    const nextToken = data?.token
-    const nextRole = data?.roleName
-    if (!nextToken) {
-      throw new Error('Login response did not include a token.')
-    }
-    if (!nextRole) {
-      console.warn('Login response did not include roleName; role-based features may not work.')
-    }
-    setSession({ token: nextToken, username: u, roleName: nextRole })
-    setToken(nextToken)
-    setUsername(u)
-    setRoleName(nextRole)
+  const login = useCallback(async (credentials) => {
+    const data = await loginRequest(credentials)
+    if (!data?.token) throw new Error('Login response did not include a token')
+    qc.clear()
+    clearSession()
+    setSession({ token: data.token, username: data.username, roleName: data.roleName })
+    setIdentity(data)
+    setIdentityError(null)
+    setIsHydrating(false)
+    setToken(data.token)
     return data
-  }, [])
-
-  const register = useCallback(async ({ username: u, password, roleName: role }) => {
-    const { data, status } = await registerRequest({ username: u, password }, role)
-    if (status !== 200 && status !== 201) {
-      const err = new Error('Registration failed')
-      err.response = { status, data }
-      throw err
-    }
-    setSession({ token: null, username: u, roleName: role })
-    setToken(null)
-    setUsername(u)
-    setRoleName(role)
-    return parseRegisterMessage(data)
-  }, [])
+  }, [qc])
 
   const logout = useCallback(() => {
     clearSession()
+    qc.clear()
     setToken(null)
-    setUsername(null)
-    setRoleName(null)
-  }, [])
+    setIdentity(null)
+    setIdentityError(null)
+    setIsHydrating(false)
+  }, [qc])
 
-  const hydrateRole = useCallback((role) => {
-    if (!role) return
-    setSession({ roleName: role })
-    setRoleName(role)
-  }, [])
-
-  const value = useMemo(
-    () => ({
-      token,
-      username,
-      roleName,
-      isAuthenticated,
-      login,
-      register,
-      logout,
-      hydrateRole,
-    }),
-    [token, username, roleName, isAuthenticated, login, register, logout, hydrateRole],
-  )
+  const value = useMemo(() => ({
+    token, username: identity?.username, roleName: identity?.roleName,
+    studentId: identity?.studentId ?? null, isAuthenticated: Boolean(token),
+    isHydrating, identityError, login, logout,
+  }), [token, identity, isHydrating, identityError, login, logout])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

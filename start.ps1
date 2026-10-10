@@ -82,6 +82,42 @@ try {
         $env:DEMO_DB_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($passwordPointer)
         $env:DEMO_JWT_SECRET = [Guid]::NewGuid().ToString('N') + [Guid]::NewGuid().ToString('N')
 
+        # 新版增加关系与约束；先备份已有练习库，再允许后端更新表结构。
+        $mysqlService = Get-CimInstance Win32_Service | Where-Object { $_.Name -match '^MySQL' } | Select-Object -First 1
+        if (-not $mysqlService -or $mysqlService.PathName -notmatch '^"([^"]+mysqld\.exe)"') {
+            throw '未定位 MySQL 服务程序，无法执行升级前备份。请先核对 MySQL 安装位置。'
+        }
+        $mysqlBin = Split-Path -Parent $Matches[1]
+        $mysqlClient = Join-Path $mysqlBin 'mysql.exe'
+        $mysqlDump = Join-Path $mysqlBin 'mysqldump.exe'
+        if (-not (Test-Path -LiteralPath $mysqlClient) -or -not (Test-Path -LiteralPath $mysqlDump)) {
+            throw 'MySQL 备份工具缺失，请先核对安装目录。'
+        }
+        $previousMysqlPassword = $env:MYSQL_PWD
+        try {
+            $env:MYSQL_PWD = $env:DEMO_DB_PASSWORD
+            $existsQuery = "--execute=SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name='student_web_demo_20261010'"
+            $databaseExists = & $mysqlClient '--host=127.0.0.1' '--port=3306' '--user=root' '--batch' '--skip-column-names' $existsQuery
+            if ($LASTEXITCODE -ne 0) { throw '数据库连接检查失败，请核对密码。' }
+            if ([int]$databaseExists -gt 0) {
+                $backupFile = Join-Path $runtimeDirectory ('database-before-upgrade-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.sql')
+                & $mysqlDump '--host=127.0.0.1' '--port=3306' '--user=root' '--single-transaction' '--skip-lock-tables' '--set-gtid-purged=OFF' ('--result-file=' + $backupFile) '--databases' 'student_web_demo_20261010'
+                if ($LASTEXITCODE -ne 0) { throw '数据库备份失败，已停止启动，未执行新版表结构更新。' }
+                Write-Host ('升级前数据库备份：' + $backupFile)
+                $tableQuery = "--execute=SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='student_web_demo_20261010' AND table_name='enrollments'"
+                $tableExists = & $mysqlClient '--host=127.0.0.1' '--port=3306' '--user=root' '--batch' '--skip-column-names' $tableQuery
+                if ($LASTEXITCODE -ne 0) { throw '数据库表检查失败，已停止启动。' }
+                if ([int]$tableExists -gt 0) {
+                    $duplicateQuery = '--execute=SELECT COUNT(*) FROM (SELECT student_id,course_id FROM enrollments GROUP BY student_id,course_id HAVING COUNT(*)>1) AS duplicate_pairs'
+                    $duplicateCount = & $mysqlClient '--host=127.0.0.1' '--port=3306' '--user=root' '--database=student_web_demo_20261010' '--batch' '--skip-column-names' $duplicateQuery
+                    if ($LASTEXITCODE -ne 0) { throw '选课完整性检查失败，已停止启动。' }
+                    if ([int]$duplicateCount -gt 0) { throw '现有库存在重复选课，已保存备份；请核对记录后再升级，系统不会自动删除历史记录。' }
+                }
+            }
+        } finally {
+            $env:MYSQL_PWD = $previousMysqlPassword
+        }
+
         # 同时复核保留的中文控制台项目，测试只处理本次临时记录。
         $consoleProject = Join-Path (Split-Path -Parent $PSScriptRoot) 'Student-Management-System'
         $consoleCheck = Join-Path $consoleProject 'out/DatabaseSmokeTest.class'
@@ -127,20 +163,8 @@ try {
     }
     if (-not $backendReady) { throw '后端启动超时，请查看 .runtime/backend.stdout.log。' }
 
-    # 创建专用的网页演示账号。与 MySQL root 账号完全分开。
+    # localdemo 后端启动时初始化专用账号，公开注册接口不能创建管理员。
     $demoAccount = @{ username = 'demo_admin'; password = 'Demo12345!' } | ConvertTo-Json -Compress
-    $registrationRequest = @{
-        Uri = ($api + '/api/auth/register?roleName=ROLE_ADMIN')
-        Method = 'Post'
-        ContentType = 'application/json'
-        Body = $demoAccount
-        NoProxy = $true
-        SkipHttpErrorCheck = $true
-    }
-    $register = Invoke-WebRequest @registrationRequest
-    if ($register.StatusCode -ne 201 -and -not ($register.StatusCode -eq 400 -and $register.Content -match 'already exists')) {
-        throw ('网页演示账号初始化失败，HTTP ' + $register.StatusCode)
-    }
     $loginRequest = @{
         Uri = ($api + '/api/auth/login')
         Method = 'Post'

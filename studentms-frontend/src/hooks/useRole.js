@@ -5,8 +5,7 @@ export function useRole() {
   const isAdmin = roleName === 'ROLE_ADMIN'
   const isTeacher = roleName === 'ROLE_TEACHER'
   const isStudent = roleName === 'ROLE_STUDENT'
-  const isAdminUsername = username?.toLowerCase() === 'admin'
-  const canAdminActions = isAdmin || isAdminUsername
+  const canAdminActions = isAdmin
 
   return {
     roleName,

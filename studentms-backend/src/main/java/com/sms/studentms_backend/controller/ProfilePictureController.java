@@ -3,37 +3,32 @@ package com.sms.studentms_backend.controller;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.io.IOException;
+import java.nio.file.*;
 
 @RestController
-@RequestMapping("/api/profile-pictures")
+@RequestMapping({"/api/profile-pictures", "/profile-pictures"})
 public class ProfilePictureController {
-
-    @Value("${file.upload-dir}")
-    private String uploadDir;
+    private final Path directory;
+    public ProfilePictureController(@Value("${file.upload-dir}") String uploadDir) {
+        directory = Paths.get(uploadDir).toAbsolutePath().normalize();
+    }
 
     @GetMapping("/{filename:.+}")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Resource> getImage(@PathVariable String filename) {
-        try {
-            Path file = Paths.get(uploadDir).resolve(filename).normalize();
-            Resource resource = new UrlResource(file.toUri());
-            if (resource.exists() && resource.isReadable()) {
-                return ResponseEntity.ok()
-                        .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
-                        .body(resource);
-            } else {
-                return ResponseEntity.notFound().build();
-            }
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    @PreAuthorize("@studentAccess.canReadPhoto(#filename, authentication)")
+    public ResponseEntity<Resource> getImage(@PathVariable String filename) throws IOException {
+        Path file = directory.resolve(filename).normalize();
+        if (!file.startsWith(directory) || !file.getParent().equals(directory)) {
+            return ResponseEntity.badRequest().build();
         }
+        Resource resource = new UrlResource(file.toUri());
+        if (!resource.exists() || !resource.isReadable()) return ResponseEntity.notFound().build();
+        MediaType type = filename.toLowerCase().endsWith(".png") ? MediaType.IMAGE_PNG : MediaType.IMAGE_JPEG;
+        return ResponseEntity.ok().contentType(type)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline")
+                .header("X-Content-Type-Options", "nosniff").body(resource);
     }
 }

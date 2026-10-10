@@ -8,6 +8,8 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface CourseRepository extends JpaRepository<Course, Long> {
 
+    java.util.Optional<Course> findByCode(String code);
+
     @Query("SELECT COUNT(c) FROM Course c")
     long countTotalCourses();
 }

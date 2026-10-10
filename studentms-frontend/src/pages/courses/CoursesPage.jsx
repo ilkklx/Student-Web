@@ -16,6 +16,10 @@ import { queryKeys } from '../../lib/queryKeys'
 import { enrollStudent, getStudents } from '../../lib/studentsApi'
 import CourseFormModal from './CourseFormModal'
 import { useSearchParams } from 'react-router-dom'
+import api from '../../lib/api'
+import { useRole } from '../../hooks/useRole'
+import CourseManagementModal from './CourseManagementModal'
+import SchoolClassModal from './SchoolClassModal'
 
 const swatches = [
   'bg-sky-500/20 text-sky-200',
@@ -26,6 +30,9 @@ const swatches = [
 
 export default function CoursesPage() {
   const qc = useQueryClient()
+  const { isAdmin, isTeacher } = useRole()
+  const [managementCourse, setManagementCourse] = useState(null)
+  const [classOpen, setClassOpen] = useState(false)
   const [q, setQ] = useState('')
   const [page, setPage] = useState(1)
   const pageSize = 6
@@ -33,13 +40,9 @@ export default function CoursesPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const catalogQuery = useQuery({
     queryKey: ['school-course-catalog'],
-    queryFn: async () => {
-      const response = await fetch('/school-catalog.json')
-      if (!response.ok) throw new Error('课程分类目录加载失败')
-      return response.json()
-    },
+    queryFn: async () => (await api.get('/catalog')).data,
   })
-  const catalog = catalogQuery.data || []
+  const catalog = useMemo(() => catalogQuery.data || [], [catalogQuery.data])
   const selectedMajor = catalog.find(m => m.name === searchParams.get('major'))
   const selectedClass = selectedMajor?.classes.find(c => c.name === searchParams.get('class'))
   const showAll = searchParams.get('all') === '1'
@@ -56,14 +59,13 @@ export default function CoursesPage() {
   const [panelCourseId, setPanelCourseId] = useState(null)
   const [studentQ, setStudentQ] = useState('')
   const [studentId, setStudentId] = useState('')
-  const [grade, setGrade] = useState('A')
 
   const coursesQuery = useQuery({ queryKey: queryKeys.courses, queryFn: getCourses })
 
   const studentsQuery = useQuery({
     queryKey: queryKeys.students({ page: 0, size: 20, name: studentQ || undefined }),
     queryFn: () => getStudents({ page: 0, size: 20, name: studentQ || undefined, sortBy: 'id', sortDir: 'asc' }),
-    enabled: panelOpen,
+    enabled: panelOpen && (isAdmin || isTeacher),
   })
 
   const createMut = useMutation({
@@ -79,7 +81,7 @@ export default function CoursesPage() {
   })
 
   const enrollMut = useMutation({
-    mutationFn: () => enrollStudent(Number(studentId), Number(panelCourseId), grade),
+    mutationFn: () => enrollStudent(Number(studentId), Number(panelCourseId)),
     onSuccess: async () => {
       toast.success('Enrolled')
       await qc.invalidateQueries({ queryKey: queryKeys.studentCourses(Number(studentId)) })
@@ -139,9 +141,11 @@ export default function CoursesPage() {
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">按专业、班级浏览课表中的课程。</p>
           </div>
           <div className="flex flex-wrap gap-2">
+            {isAdmin && <button type="button" onClick={() => setClassOpen(true)} className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold dark:border-white/20">管理班级课表</button>}
             <button
               type="button"
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
+              disabled={!isAdmin && !isTeacher}
               onClick={() => setPanelOpen(true)}
             >
               <FunnelIcon className="h-5 w-5" />
@@ -149,6 +153,7 @@ export default function CoursesPage() {
             </button>
             <button
               type="button"
+              disabled={!isAdmin}
               onClick={() => setAddOpen(true)}
               className="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500 dark:bg-sky-600 dark:hover:bg-sky-500"
             >
@@ -209,6 +214,7 @@ export default function CoursesPage() {
                 <button
                   type="button"
                   onClick={() => {
+                    if (!isAdmin && !isTeacher) return
                     setPanelCourseId(c.id)
                     setPanelOpen(true)
                   }}
@@ -217,6 +223,7 @@ export default function CoursesPage() {
                   Enroll
                 </button>
               </div>
+              {isAdmin && <button type="button" onClick={() => setManagementCourse(c)} className="mt-3 text-sm font-semibold text-indigo-600 dark:text-indigo-300">安排教师／班级</button>}
               <div className="mt-3 text-sm font-semibold text-sky-600 dark:text-sky-300">{c.code}</div>
               <div className="mt-1 text-base font-semibold text-slate-900 dark:text-white">{c.title}</div>
               <div className="mt-3 inline-flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
@@ -346,22 +353,6 @@ export default function CoursesPage() {
               </select>
             </div>
 
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">Grade</label>
-              <select
-                value={grade}
-                onChange={(e) => setGrade(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-sky-500/40 dark:border-white/10 dark:bg-slate-950/40 dark:text-white dark:focus:ring-sky-500/40"
-              >
-                {['A', 'B', 'C', 'D', 'F'].map((g) => (
-                  <option key={g} value={g}>
-                    {g}
-                  </option>
-                ))}
-              </select>
-              <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-500">Grade is required by the enroll API.</p>
-            </div>
-
             <div className="flex gap-2 pt-2">
               <button
                 type="button"
@@ -384,6 +375,8 @@ export default function CoursesPage() {
         </div>
       </aside>
 
+      {managementCourse && <CourseManagementModal course={managementCourse} catalog={catalog} onClose={() => setManagementCourse(null)} />}
+      {classOpen && <SchoolClassModal catalog={catalog} courses={coursesQuery.data || []} onClose={() => setClassOpen(false)} />}
       <CourseFormModal open={addOpen} onClose={() => setAddOpen(false)} onSubmit={(v) => createMut.mutateAsync(v)} />
     </div>
   )

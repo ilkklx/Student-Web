@@ -8,15 +8,18 @@ import lombok.Data;
 public class StudentRegistrationRequest {
 
     @NotBlank
+    @jakarta.validation.constraints.Size(min = 3, max = 100)
     private String username;
 
     @NotBlank
+    @jakarta.validation.constraints.Size(min = 8, max = 72)
     private String password;
 
     @NotBlank
     private String roleName = "ROLE_STUDENT";
 
     @NotBlank
+    @jakarta.validation.constraints.Size(min = 2, max = 100)
     private String name;
 
     @Email

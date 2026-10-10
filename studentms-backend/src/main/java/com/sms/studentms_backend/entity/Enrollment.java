@@ -6,7 +6,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "enrollments")
+@Table(name = "enrollments", uniqueConstraints = @UniqueConstraint(
+        name = "uk_enrollment_student_course", columnNames = {"student_id", "course_id"}))
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -23,5 +24,8 @@ public class Enrollment {
     @JoinColumn(name = "course_id", nullable = false)
     private Course course;
 
-    private String grade;  // "A", "B+", etc.
+    private String grade;
+
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean withdrawn = false;
 }

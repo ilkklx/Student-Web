@@ -13,6 +13,9 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import org.springframework.security.access.prepost.PreAuthorize;
+import com.sms.studentms_backend.service.AccountService;
+import com.sms.studentms_backend.dto.LoginRequest;
 
 import com.sms.studentms_backend.dto.BulkDeleteDTO;
 import org.springframework.http.HttpHeaders;
@@ -22,13 +25,24 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/students")
+@PreAuthorize("hasRole('ADMIN')")
 public class StudentController {
+
+    @Autowired
+    private AccountService accountService;
+
+    @PostMapping("/{id}/account")
+    public StudentDTO bindAccount(@PathVariable Long id, @RequestBody LoginRequest request) {
+        accountService.bindStudent(id, request.getUsername(), request.getPassword());
+        return studentService.getStudentById(id);
+    }
 
     @Autowired
     private StudentService studentService;
 
     // GET all with pagination, sorting, search (Phase 3)
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     public Page<StudentDTO> getAllStudents(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -42,6 +56,7 @@ public class StudentController {
 
     // GET single student
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN') or @studentAccess.canRead(#id, authentication)")
     public StudentDTO getStudentById(@PathVariable Long id) {
         return studentService.getStudentById(id);
     }
@@ -68,6 +83,7 @@ public class StudentController {
 
     // Upload photo for a student
     @PostMapping("/{id}/photo")
+    @PreAuthorize("hasRole('ADMIN') or @studentAccess.isOwner(#id, authentication)")
     public ResponseEntity<StudentDTO> uploadPhoto(
             @PathVariable Long id,
             @RequestParam("file") MultipartFile file) {
@@ -77,22 +93,38 @@ public class StudentController {
 
     // ========== Enrollment Endpoints ==========
     @PostMapping("/{studentId}/enroll")
+    @PreAuthorize("hasRole('ADMIN') or @studentAccess.canManageCourse(#courseId, authentication)")
     public ResponseEntity<EnrollmentDTO> enrollStudent(
             @PathVariable Long studentId,
             @RequestParam Long courseId,
-            @RequestParam String grade) {
+            @RequestParam(required = false) String grade) {
         return ResponseEntity.ok(studentService.enrollStudentInCourse(studentId, courseId, grade));
     }
 
     @DeleteMapping("/{studentId}/enroll/{courseId}")
+    @PreAuthorize("hasRole('ADMIN') or @studentAccess.isOwner(#studentId, authentication) or @studentAccess.canManageCourse(#courseId, authentication)")
     public ResponseEntity<Void> dropCourse(@PathVariable Long studentId, @PathVariable Long courseId) {
         studentService.dropCourse(studentId, courseId);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{studentId}/courses")
+    @PreAuthorize("hasRole('ADMIN') or @studentAccess.canRead(#studentId, authentication)")
     public List<CourseDTO> getStudentCourses(@PathVariable Long studentId) {
         return studentService.getCoursesForStudent(studentId);
+    }
+
+    @GetMapping("/{studentId}/enrollments")
+    @PreAuthorize("hasRole('ADMIN') or @studentAccess.canRead(#studentId, authentication)")
+    public List<EnrollmentDTO> getEnrollments(@PathVariable Long studentId) {
+        return studentService.getEnrollmentsForStudent(studentId);
+    }
+
+    @PatchMapping("/{studentId}/enroll/{courseId}/grade")
+    @PreAuthorize("hasRole('ADMIN') or @studentAccess.canManageCourse(#courseId, authentication)")
+    public EnrollmentDTO recordGrade(@PathVariable Long studentId, @PathVariable Long courseId,
+                                     @RequestParam String grade) {
+        return studentService.recordGrade(studentId, courseId, grade);
     }
 
     @DeleteMapping("/bulk")

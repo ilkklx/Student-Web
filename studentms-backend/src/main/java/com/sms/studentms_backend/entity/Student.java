@@ -30,9 +30,26 @@ public class Student {
 
     private String department;
 
+    @Column(unique = true, length = 32)
+    private String studentNumber;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "class_id")
+    @lombok.ToString.Exclude
+    @lombok.EqualsAndHashCode.Exclude
+    private SchoolClass schoolClass;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", unique = true)
+    @lombok.ToString.Exclude
+    @lombok.EqualsAndHashCode.Exclude
+    private User user;
+
     private String photoUrl;   // e.g., "/uploads/student-1.jpg"
 
     @OneToMany(mappedBy = "student", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @lombok.ToString.Exclude
+    @lombok.EqualsAndHashCode.Exclude
     private Set<Enrollment> enrollments = new HashSet<>();
 
     @Column

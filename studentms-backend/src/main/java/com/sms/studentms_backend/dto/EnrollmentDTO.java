@@ -14,4 +14,6 @@ public class EnrollmentDTO {
     private String grade;
     private String courseCode;   // for display
     private String courseTitle;  // for display
+    private Integer credits;
+    private boolean withdrawn;
 }

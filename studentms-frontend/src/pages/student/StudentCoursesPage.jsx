@@ -1,110 +1,42 @@
-import { TrashIcon } from '@heroicons/react/24/outline'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'react-toastify'
-import Spinner from '../../components/ui/Spinner'
-import { getLinkedStudentId } from '../../lib/authStorage'
+import { useAuth } from '../../context/AuthContext'
+import { dropCourse, getStudentCourses } from '../../lib/studentsApi'
 import { getApiErrorMessage } from '../../lib/errors'
 import { queryKeys } from '../../lib/queryKeys'
-import { dropCourse, getStudentCourses } from '../../lib/studentsApi'
+import Spinner from '../../components/ui/Spinner'
 
 export default function StudentCoursesPage() {
+  const { studentId, isHydrating, identityError } = useAuth()
   const qc = useQueryClient()
-  const id = getLinkedStudentId()
-
-  const q = useQuery({
-    queryKey: queryKeys.studentCourses(id),
-    queryFn: () => getStudentCourses(id),
-    enabled: Boolean(id),
-  })
-
-  const dropMut = useMutation({
-    mutationFn: (courseId) => dropCourse(id, courseId),
+  const query = useQuery({ queryKey: ['enrollmentHistory', studentId], queryFn: () => getStudentCourses(studentId, true), enabled: Boolean(studentId) })
+  const drop = useMutation({
+    mutationFn: (id) => dropCourse(studentId, id),
     onSuccess: async () => {
-      toast.success('Dropped course')
-      await qc.invalidateQueries({ queryKey: queryKeys.studentCourses(id) })
-      await qc.invalidateQueries({ queryKey: queryKeys.dashboardStats })
+      toast.success('已退课，历史记录已保留')
+      await qc.invalidateQueries({ queryKey: ['enrollmentHistory', studentId] })
+      await qc.invalidateQueries({ queryKey: queryKeys.studentCourses(studentId) })
     },
-    onError: (e) => toast.error(getApiErrorMessage(e, 'Drop failed (permissions?)')),
+    onError: (error) => toast.error(getApiErrorMessage(error)),
   })
-
-  if (!id) {
-    return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-600 dark:border-white/10 dark:bg-white/[0.02] dark:text-slate-300">
-        Link your student profile first on{' '}
-        <Link className="text-violet-600 hover:text-violet-700 dark:text-violet-300 dark:hover:text-violet-200" to="/student/profile">
-          Profile
-        </Link>
-        .
-      </div>
-    )
-  }
-
-  if (q.isPending) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <Spinner className="h-10 w-10" />
-      </div>
-    )
-  }
-
-  if (q.isError) {
-    return (
-      <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-6 text-sm text-rose-800 dark:text-rose-100">
-        {getApiErrorMessage(q.error)}
-      </div>
-    )
-  }
-
-  const rows = q.data || []
-
+  if (isHydrating || (studentId && query.isPending)) return <Spinner className="h-8 w-8" />
+  if (identityError || query.isError) return <p role="alert">{getApiErrorMessage(identityError || query.error)}</p>
+  if (!studentId) return <p>账号尚未绑定学生档案，请联系管理员。</p>
+  const rows = query.data || []
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">My courses</h1>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Courses you are enrolled in.</p>
-      </div>
-
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.02]">
-        <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-white/10">
-          <thead className="bg-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-700 dark:bg-black/20 dark:text-slate-400">
-            <tr>
-              <th className="px-4 py-3">Code</th>
-              <th className="px-4 py-3">Title</th>
-              <th className="px-4 py-3">Credits</th>
-              <th className="px-4 py-3 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200 dark:divide-white/10">
-            {rows.map((c) => (
-              <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-white/[0.03]">
-                <td className="px-4 py-3 text-slate-600 dark:text-slate-200">{c.code}</td>
-                <td className="px-4 py-3 text-slate-900 dark:text-white">{c.title}</td>
-                <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{c.credits}</td>
-                <td className="px-4 py-3 text-right">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!window.confirm(`Drop ${c.code}?`)) return
-                      dropMut.mutate(c.id)
-                    }}
-                    className="inline-flex items-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-500/15 dark:text-rose-100 dark:hover:bg-rose-500/15"
-                  >
-                    <TrashIcon className="h-4 w-4" />
-                    Drop
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {rows.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="px-4 py-10 text-center text-sm text-slate-500 dark:text-slate-400">
-                  No enrollments yet.
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
+      <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">我的课程与成绩</h1>
+      <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-white/10">
+        <table className="min-w-full text-left text-sm">
+          <thead><tr>{['课程', '学分', '状态', '成绩', '操作'].map(h => <th className="p-4" key={h}>{h}</th>)}</tr></thead>
+          <tbody>{rows.map(c => <tr key={c.enrollmentId} className="border-t border-slate-200 dark:border-white/10">
+            <td className="p-4">{c.code} · {c.title}</td><td className="p-4">{c.credits ?? '未提供'}</td>
+            <td className="p-4">{c.withdrawn ? '已退课' : c.grade ? '已评分' : '待评分'}</td><td className="p-4">{c.grade || '—'}</td>
+            <td className="p-4"><button className="text-rose-600 disabled:opacity-40" disabled={c.withdrawn || Boolean(c.grade) || drop.isPending}
+              onClick={() => { if (window.confirm('确认退课？')) drop.mutate(c.id) }}>退课</button></td>
+          </tr>)}</tbody>
         </table>
+        {!rows.length && <p className="p-5 text-slate-500">暂无选课记录。</p>}
       </div>
     </div>
   )

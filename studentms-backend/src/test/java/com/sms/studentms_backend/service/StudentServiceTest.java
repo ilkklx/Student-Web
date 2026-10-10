@@ -24,6 +24,9 @@ class StudentServiceTest {
     private StudentRepository studentRepository;
 
     @Mock
+    private com.sms.studentms_backend.repository.SchoolClassRepository schoolClassRepository;
+
+    @Mock
     private FileStorageService fileStorageService; // needed but not used in these tests
 
     @InjectMocks
@@ -50,19 +53,19 @@ class StudentServiceTest {
 
     @Test
     void createStudent_ShouldSaveAndReturnDTO() {
-        when(studentRepository.save(any(Student.class))).thenReturn(student);
+        when(studentRepository.saveAndFlush(any(Student.class))).thenReturn(student);
 
         StudentDTO result = studentService.createStudent(studentDTO);
 
         assertNotNull(result);
         assertEquals(1L, result.getId());
         assertEquals("John Doe", result.getName());
-        verify(studentRepository, times(1)).save(any(Student.class));
+        verify(studentRepository, times(1)).saveAndFlush(any(Student.class));
     }
 
     @Test
     void getStudentById_WhenExists_ShouldReturnDTO() {
-        when(studentRepository.findById(1L)).thenReturn(Optional.of(student));
+        when(studentRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(student));
 
         StudentDTO result = studentService.getStudentById(1L);
 
@@ -73,14 +76,14 @@ class StudentServiceTest {
 
     @Test
     void getStudentById_WhenNotFound_ShouldThrowException() {
-        when(studentRepository.findById(99L)).thenReturn(Optional.empty());
+        when(studentRepository.findByIdAndDeletedFalse(99L)).thenReturn(Optional.empty());
 
         assertThrows(StudentNotFoundException.class, () -> studentService.getStudentById(99L));
     }
 
     @Test
     void deleteStudent_ShouldSetDeletedTrueAndSave() {
-        when(studentRepository.findById(1L)).thenReturn(Optional.of(student));
+        when(studentRepository.findActiveForUpdate(1L)).thenReturn(Optional.of(student));
         when(studentRepository.save(any(Student.class))).thenReturn(student);
 
         studentService.deleteStudent(1L);

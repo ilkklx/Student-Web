@@ -24,4 +24,13 @@ public class StudentDTO {
     private String department;
 
     private String photoUrl;
+
+    private String accountUsername;
+
+    @jakarta.validation.constraints.Pattern(regexp = "[0-9]{6,32}", message = "Student number must contain 6 to 32 digits")
+    private String studentNumber;
+
+    public StudentDTO(Long id, String name, String email, String department, String photoUrl) {
+        this(id, name, email, department, photoUrl, null, null);
+    }
 }

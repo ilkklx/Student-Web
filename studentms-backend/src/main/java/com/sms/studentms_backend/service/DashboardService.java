@@ -1,60 +1,36 @@
 package com.sms.studentms_backend.service;
 
 import com.sms.studentms_backend.dto.DashboardStatsDTO;
-import com.sms.studentms_backend.repository.CourseRepository;
-import com.sms.studentms_backend.repository.EnrollmentRepository;
-import com.sms.studentms_backend.repository.StudentRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.sms.studentms_backend.repository.*;
 import org.springframework.stereotype.Service;
-
+import org.springframework.transaction.annotation.Transactional;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 @Service
 public class DashboardService {
+    private final StudentRepository students;
+    private final CourseRepository courses;
+    private final EnrollmentRepository enrollments;
 
-    @Autowired
-    private StudentRepository studentRepository;
+    public DashboardService(StudentRepository students, CourseRepository courses, EnrollmentRepository enrollments) {
+        this.students = students; this.courses = courses; this.enrollments = enrollments;
+    }
 
-    @Autowired
-    private CourseRepository courseRepository;
-
-    @Autowired
-    private EnrollmentRepository enrollmentRepository;
-
+    @Transactional(readOnly = true)
     public DashboardStatsDTO getDashboardStats() {
-        long totalStudents = 0;
-        long totalCourses = 0;
-        long totalEnrollments = 0;
-        Double averageAge = null;
-        Map<String, Long> studentsPerDepartment = new HashMap<>();
+        Map<String, Long> counts = new HashMap<>();
+        for (Object[] row : students.countStudentsByDepartment()) {
+            if (row[0] != null) counts.put((String) row[0], ((Number) row[1]).longValue());
+        }
+        return new DashboardStatsDTO(students.countTotalStudents(), courses.countTotalCourses(),
+                enrollments.countTotalEnrollments(), null, counts);
+    }
 
-        try {
-            totalStudents = studentRepository.countTotalStudents();
-        } catch (Exception e) { /* log */ }
-
-        try {
-            totalCourses = courseRepository.countTotalCourses();
-        } catch (Exception e) { /* log */ }
-
-        try {
-            totalEnrollments = enrollmentRepository.countTotalEnrollments();
-        } catch (Exception e) { /* log */ }
-
-        try {
-            averageAge = studentRepository.getAverageAge();
-        } catch (Exception e) { /* log */ }
-
-        try {
-            List<Object[]> deptData = studentRepository.countStudentsByDepartment();
-            for (Object[] row : deptData) {
-                if (row[0] != null && row[1] != null) {
-                    studentsPerDepartment.put((String) row[0], ((Number) row[1]).longValue());
-                }
-            }
-        } catch (Exception e) { /* log */ }
-
-        return new DashboardStatsDTO(totalStudents, totalCourses, totalEnrollments, averageAge, studentsPerDepartment);
+    @Transactional(readOnly = true)
+    public DashboardStatsDTO getTeacherStats(String username) {
+        long roster = students.searchActive("", "", username, org.springframework.data.domain.PageRequest.of(0, 1)).getTotalElements();
+        long courseCount = courses.findAll().stream().filter(c -> c.getTeacher() != null && c.getTeacher().getUsername().equals(username)).count();
+        return new DashboardStatsDTO(roster, courseCount, enrollments.countTeacherEnrollments(username), null, Map.of());
     }
 }

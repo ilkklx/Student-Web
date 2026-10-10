@@ -49,18 +49,31 @@ export async function uploadStudentPhoto(id, file) {
   return data
 }
 
-export async function getStudentCourses(studentId) {
-  const { data } = await api.get(`/students/${studentId}/courses`)
-  return data
+export async function getStudentCourses(studentId, includeWithdrawn = false) {
+  const { data } = await api.get(`/students/${studentId}/enrollments`)
+  return data.filter(e => includeWithdrawn || !e.withdrawn).map(e => ({
+    id: e.courseId, enrollmentId: e.id, code: e.courseCode, title: e.courseTitle,
+    credits: e.credits, grade: e.grade, withdrawn: e.withdrawn,
+  }))
 }
 
-export async function enrollStudent(studentId, courseId, grade) {
+export async function enrollStudent(studentId, courseId) {
   const { data } = await api.post(`/students/${studentId}/enroll`, null, {
-    params: { courseId, grade },
+    params: { courseId },
   })
   return data
 }
 
 export async function dropCourse(studentId, courseId) {
   await api.delete(`/students/${studentId}/enroll/${courseId}`)
+}
+
+export async function recordGrade(studentId, courseId, grade) {
+  const { data } = await api.patch(`/students/${studentId}/enroll/${courseId}/grade`, null, { params: { grade } })
+  return data
+}
+
+export async function bindStudentAccount(studentId, body) {
+  const { data } = await api.post(`/students/${studentId}/account`, body)
+  return data
 }

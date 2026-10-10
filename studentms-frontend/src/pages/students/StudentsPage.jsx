@@ -25,6 +25,7 @@ import {
   uploadStudentPhoto,
 } from '../../lib/studentsApi'
 import StudentFormModal from './StudentFormModal'
+import StudentAccountModal from './StudentAccountModal'
 
 const deptColors = [
   'bg-indigo-300 text-black ring-indigo-400 dark:bg-indigo-300 dark:text-black dark:ring-indigo-400',
@@ -54,6 +55,7 @@ export default function StudentsPage() {
 
   const [selected, setSelected] = useState(() => new Set())
   const [modal, setModal] = useState({ open: false, mode: 'create', student: null })
+  const [accountStudent, setAccountStudent] = useState(null)
   const fileRef = useRef(null)
   const [uploadForId, setUploadForId] = useState(null)
 
@@ -376,6 +378,7 @@ export default function StudentsPage() {
                       <button
                         type="button"
                         onClick={() => onPickPhoto(s.id)}
+                        disabled={!canAdminActions}
                         className="rounded-lg border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-100 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
                         title="Upload photo"
                       >
@@ -386,6 +389,7 @@ export default function StudentsPage() {
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-medium text-slate-900 dark:text-white">{s.name}</span>
+                      {s.studentNumber && <span className="text-xs text-slate-500 dark:text-slate-400">学号 {s.studentNumber}</span>}
                       <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-800 ring-1 ring-sky-200 dark:bg-sky-500/15 dark:text-sky-200 dark:ring-sky-500/20">
                         Active
                       </span>
@@ -399,8 +403,10 @@ export default function StudentsPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-2">
+                      {canAdminActions && <button type="button" disabled={Boolean(s.accountUsername)} onClick={() => setAccountStudent(s)} className="text-xs font-semibold text-indigo-600 disabled:opacity-50 dark:text-indigo-300">{s.accountUsername || '绑定账号'}</button>}
                       <button
                         type="button"
+                        disabled={!canAdminActions}
                         onClick={() => setModal({ open: true, mode: 'edit', student: s })}
                         className="rounded-full border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-100 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
                         title="Edit"
@@ -484,6 +490,7 @@ export default function StudentsPage() {
         </div>
       </div>
 
+      {accountStudent && <StudentAccountModal student={accountStudent} onClose={() => setAccountStudent(null)} />}
       <StudentFormModal
         open={modal.open}
         mode={modal.mode}

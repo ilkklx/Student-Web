@@ -19,6 +19,7 @@ import ProtectedRoute from './routes/ProtectedRoute'
 import RoleRoute from './routes/RoleRoute'
 import RootRedirect from './routes/RootRedirect'
 import { R } from './lib/roles'
+import AccountsPage from './pages/admin/AccountsPage'
 
 export default function App() {
   return (
@@ -68,7 +69,8 @@ export default function App() {
         />
 
         <Route path="courses" element={<CoursesPage />} />
-        <Route path="enrollments" element={<EnrollmentsPage />} />
+        <Route path="enrollments" element={<RoleRoute roles={[R.ADMIN, R.TEACHER]}><EnrollmentsPage /></RoleRoute>} />
+        <Route path="admin/accounts" element={<RoleRoute roles={[R.ADMIN]}><AccountsPage /></RoleRoute>} />
 
         <Route
           path="admin/recycle"

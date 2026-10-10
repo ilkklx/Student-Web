@@ -2,7 +2,7 @@ import { ArrowPathIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import Spinner from '../../components/ui/Spinner'
-import { absolutePhotoUrl } from '../../lib/assets'
+import StudentPhoto from '../../components/ui/StudentPhoto'
 import { getApiErrorMessage } from '../../lib/errors'
 import { queryKeys } from '../../lib/queryKeys'
 import { getStudents } from '../../lib/studentsApi'
@@ -129,17 +129,12 @@ export default function TeacherRosterPage() {
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-white/10">
               {rows.map((s, idx) => {
-                const photo = absolutePhotoUrl(s.photoUrl)
                 return (
                   <tr key={s.id} className="hover:bg-slate-50 dark:hover:bg-white/[0.03]">
                     <td className="px-4 py-3 text-slate-500 dark:text-slate-500">{pageNumber * size + idx + 1}</td>
                     <td className="px-4 py-3">
                       <div className="h-10 w-10 overflow-hidden rounded-full border border-slate-200 bg-slate-100 dark:border-white/10 dark:bg-slate-900">
-                        {photo ? (
-                          <img src={photo} alt="" className="h-full w-full object-cover" />
-                        ) : (
-                          <div className="grid h-full w-full place-items-center text-xs text-slate-500 dark:text-slate-500">—</div>
-                        )}
+                        <StudentPhoto photoUrl={s.photoUrl} studentId={s.id} className="h-full w-full object-cover" />
                       </div>
                     </td>
                     <td className="px-4 py-3 font-medium text-slate-900 dark:text-white">{s.name}</td>
