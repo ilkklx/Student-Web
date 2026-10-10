@@ -1,0 +1,5 @@
+.tools/
+.runtime/
+studentms-backend/target/
+studentms-frontend/node_modules/
+studentms-frontend/dist/
