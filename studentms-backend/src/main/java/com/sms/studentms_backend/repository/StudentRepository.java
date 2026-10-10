@@ -34,11 +34,28 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
 
     Optional<Student> findByUserUsername(String username);
 
-    Optional<Student> findByPhotoUrlAndDeletedFalse(String photoUrl);
+    boolean existsByPhotoUrl(String photoUrl);
+
+    List<Student> findAllByPhotoUrlAndDeletedFalse(String photoUrl);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE Student s SET s.schoolClass = :schoolClass WHERE s.schoolClass IS NULL AND s.department = :department")
+    int linkMissingClass(@Param("department") String department, @Param("schoolClass") com.sms.studentms_backend.entity.SchoolClass schoolClass);
+
+    @Query("SELECT s.id, s.email FROM Student s WHERE s.studentNumber IS NULL AND s.email LIKE '%@lingnan'")
+    List<Object[]> findLegacyIdentityCandidates();
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE Student s SET s.studentNumber = :studentNumber WHERE s.id = :id AND s.studentNumber IS NULL AND s.email = :email")
+    int fillMissingStudentNumber(@Param("id") Long id, @Param("email") String email, @Param("studentNumber") String studentNumber);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT s FROM Student s WHERE s.id = :id AND s.deleted = false")
     Optional<Student> findActiveForUpdate(@Param("id") Long id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT s FROM Student s WHERE s.id = :id")
+    Optional<Student> findForUpdate(@Param("id") Long id);
 
     @Query("SELECT s FROM Student s WHERE s.deleted = false " +
             "AND (:term = '' OR LOWER(s.name) LIKE LOWER(CONCAT('%', :term, '%')) " +

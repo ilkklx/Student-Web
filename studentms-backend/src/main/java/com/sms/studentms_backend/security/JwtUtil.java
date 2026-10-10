@@ -7,6 +7,11 @@ import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
+import jakarta.annotation.PostConstruct;
+import java.nio.charset.StandardCharsets;
 
 import java.security.Key;
 import java.util.Date;
@@ -23,9 +28,22 @@ public class JwtUtil {
     @Value("${jwt.expiration}")
     private Long expiration;
 
+    @Autowired
+    private Environment environment;
+
+    private Key signingKey;
+
+    @PostConstruct
+    public void initializeSigningKey() {
+        if (secret.isBlank() && environment.acceptsProfiles(Profiles.of("h2"))) {
+            signingKey = Keys.secretKeyFor(SignatureAlgorithm.HS256);
+        } else {
+            signingKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
     private Key getSigningKey() {
-        byte[] keyBytes = secret.getBytes();
-        return Keys.hmacShaKeyFor(keyBytes);
+        return signingKey;
     }
 
     public String extractUsername(String token) {

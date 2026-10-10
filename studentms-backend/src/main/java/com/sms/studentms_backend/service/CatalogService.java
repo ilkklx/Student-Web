@@ -15,10 +15,13 @@ public class CatalogService {
     private final CourseRepository courses;
     private final StudentRepository students;
     private final MajorRepository majors;
+    private final MigrationMarkerRepository migrations;
 
-    public CatalogService(SchoolClassRepository classes, CourseRepository courses, StudentRepository students, MajorRepository majors) {
+    public CatalogService(SchoolClassRepository classes, CourseRepository courses, StudentRepository students,
+                          MajorRepository majors, MigrationMarkerRepository migrations) {
         this.classes = classes; this.courses = courses; this.students = students;
         this.majors = majors;
+        this.migrations = migrations;
     }
 
     @Transactional(readOnly = true)
@@ -53,19 +56,21 @@ public class CatalogService {
         }
         schoolClass.setCourses(assigned);
         classes.saveAndFlush(schoolClass);
-        migrateLegacyStudents();
+        students.linkMissingClass(schoolClass.getName(), schoolClass);
     }
 
     @Transactional
     public void migrateLegacyStudents() {
-        Map<String, SchoolClass> byName = new HashMap<>();
-        classes.findAll().forEach(c -> byName.put(c.getName(), c));
-        for (Student s : students.findAll()) {
-            if (s.getSchoolClass() == null && byName.containsKey(s.getDepartment())) {
-                s.setSchoolClass(byName.get(s.getDepartment()));
-            }
-            if (s.getStudentNumber() == null && s.getEmail().matches("[0-9]{12}@lingnan")) {
-                s.setStudentNumber(s.getEmail().substring(0, 12));
+        for (SchoolClass schoolClass : classes.findAll(org.springframework.data.domain.Sort.by("id"))) {
+            students.linkMissingClass(schoolClass.getName(), schoolClass);
+        }
+        String migrationName = "legacy-student-numbers-v1";
+        if (migrations.existsById(migrationName)) return;
+        migrations.saveAndFlush(new MigrationMarker(migrationName));
+        for (Object[] candidate : students.findLegacyIdentityCandidates()) {
+            String email = (String) candidate[1];
+            if (email.matches("[0-9]{12}@lingnan")) {
+                students.fillMissingStudentNumber((Long) candidate[0], email, email.substring(0, 12));
             }
         }
     }

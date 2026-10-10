@@ -6,7 +6,7 @@ import {
   PlusIcon,
   TrashIcon,
 } from '@heroicons/react/24/outline'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { toast } from 'react-toastify'
@@ -60,8 +60,8 @@ export default function StudentsPage() {
   const [uploadForId, setUploadForId] = useState(null)
 
   useEffect(() => {
-    const n = searchParams.get('name')
-    if (n != null) setName(n)
+    setName(searchParams.get('name') || '')
+    setPage(0)
   }, [searchParams])
 
   const params = useMemo(
@@ -72,6 +72,7 @@ export default function StudentsPage() {
   const { data, isPending, isError, error, refetch, isFetching } = useQuery({
     queryKey: queryKeys.students(params),
     queryFn: () => getStudents(params),
+    placeholderData: keepPreviousData,
   })
 
   const rows = data?.content || []
@@ -231,14 +232,14 @@ export default function StudentsPage() {
               Export CSV
             </button>
           ) : null}
-          <button
+          {canAdminActions && <button
             type="button"
             onClick={() => setModal({ open: true, mode: 'create', student: null })}
             className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 dark:bg-indigo-600 dark:hover:bg-indigo-500"
           >
             <PlusIcon className="h-5 w-5" />
             Add student
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -249,7 +250,10 @@ export default function StudentsPage() {
             <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Search</label>
             <input
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value)
+                setPage(0)
+              }}
               onBlur={applySearchToUrl}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') applySearchToUrl()
@@ -343,7 +347,7 @@ export default function StudentsPage() {
       {/* Students table */}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.02]">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-white/10">
+          <table aria-busy={isFetching} className="min-w-full divide-y divide-slate-200 text-sm dark:divide-white/10">
             <thead className="bg-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-700 dark:bg-black/20 dark:text-slate-400">
               <tr>
                 {canAdminActions ? (
@@ -468,7 +472,7 @@ export default function StudentsPage() {
             <div className="flex items-center gap-1">
               <button
                 type="button"
-                disabled={pageNumber <= 0}
+                disabled={pageNumber <= 0 || isFetching}
                 onClick={() => setPage((p) => Math.max(0, p - 1))}
                 className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-30 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
               >
@@ -479,7 +483,7 @@ export default function StudentsPage() {
               </div>
               <button
                 type="button"
-                disabled={pageNumber + 1 >= totalPages}
+                disabled={pageNumber + 1 >= totalPages || isFetching}
                 onClick={() => setPage((p) => p + 1)}
                 className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-30 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
               >

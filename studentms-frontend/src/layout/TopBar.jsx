@@ -13,7 +13,7 @@ import { useRole } from '../hooks/useRole'
 
 export default function TopBar({ shell, onOpenMenu }) {
   const { username, roleName, logout } = useAuth()
-  const { canAdminActions } = useRole()
+  const { canAdminActions, isStudent } = useRole()
   const { theme } = useTheme()   // ✅ get current theme (not used directly in classes, but can be used for conditional)
   const [q, setQ] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
@@ -42,6 +42,7 @@ export default function TopBar({ shell, onOpenMenu }) {
 
   const submitSearch = (e) => {
     e.preventDefault()
+    if (isStudent) return
     const term = q.trim()
     if (!term) return
     navigate(`/students?name=${encodeURIComponent(term)}`)
@@ -67,7 +68,7 @@ export default function TopBar({ shell, onOpenMenu }) {
           <Bars3Icon className="h-5 w-5" />
         </button>
 
-        <form
+        {!isStudent && <form
           className={`mx-auto hidden max-w-2xl flex-1 items-center gap-2 rounded-xl border px-3 py-2 md:flex ${
             theme === 'dark'
               ? 'border-white/10 bg-white/5'
@@ -92,7 +93,7 @@ export default function TopBar({ shell, onOpenMenu }) {
           }`}>
             Ctrl + K
           </span>
-        </form>
+        </form>}
 
         <div className="ml-auto flex items-center gap-2 sm:gap-3">
           {/* ✅ Replace old theme toggle with the new ThemeToggle component */}
@@ -100,17 +101,16 @@ export default function TopBar({ shell, onOpenMenu }) {
 
           <button
             type="button"
+            disabled
+            title="暂无通知"
             className={`relative rounded-lg border p-2 ${
               theme === 'dark'
                 ? 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'
                 : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'
             }`}
-            aria-label="Notifications"
+            aria-label="暂无通知"
           >
             <BellIcon className="h-5 w-5" />
-            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">
-              3
-            </span>
           </button>
 
           <div className="relative">
@@ -182,7 +182,7 @@ export default function TopBar({ shell, onOpenMenu }) {
         </div>
       </div>
 
-      <form className={`border-t px-4 py-2 md:hidden ${
+      {!isStudent && <form className={`border-t px-4 py-2 md:hidden ${
         theme === 'dark' ? 'border-white/5' : 'border-slate-200'
       }`} onSubmit={submitSearch}>
         <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${
@@ -200,7 +200,7 @@ export default function TopBar({ shell, onOpenMenu }) {
             }`}
           />
         </div>
-      </form>
+      </form>}
     </header>
   )
 }

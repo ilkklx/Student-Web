@@ -22,7 +22,14 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const requestAuthorization = error.config?.headers?.get?.('Authorization')
+      || error.config?.headers?.Authorization
+      || error.config?.headers?.authorization
+    const currentToken = getToken()
+    const belongsToCurrentSession = currentToken
+      ? requestAuthorization === `Bearer ${currentToken}`
+      : !requestAuthorization
+    if (error.response?.status === 401 && belongsToCurrentSession) {
       clearSession()
       const path = window.location.pathname
       if (!path.startsWith('/login') && !path.startsWith('/register')) {

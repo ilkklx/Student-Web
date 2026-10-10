@@ -23,8 +23,10 @@ public class StudentAccess {
 
     @Transactional(readOnly = true)
     public boolean canReadPhoto(String filename, Authentication auth) {
-        return students.findByPhotoUrlAndDeletedFalse("/profile-pictures/" + filename)
-                .map(s -> role(auth, "ADMIN") || canRead(s.getId(), auth)).orElse(false);
+        String photoUrl = "/profile-pictures/" + filename;
+        if (role(auth, "ADMIN")) return students.existsByPhotoUrl(photoUrl);
+        return students.findAllByPhotoUrlAndDeletedFalse(photoUrl).stream()
+                .anyMatch(s -> canRead(s.getId(), auth));
     }
 
     @Transactional(readOnly = true)
@@ -37,6 +39,12 @@ public class StudentAccess {
     public boolean canRead(Long id, Authentication auth) {
         return isOwner(id, auth) || (role(auth, "TEACHER")
                 && enrollments.existsByStudentIdAndWithdrawnFalseAndCourseTeacherUsername(id, auth.getName()));
+    }
+
+    @Transactional(readOnly = true)
+    public boolean canReadEnrollments(Long id, Authentication auth) {
+        return isOwner(id, auth) || (role(auth, "TEACHER")
+                && enrollments.existsByStudentIdAndStudentDeletedFalseAndCourseTeacherUsername(id, auth.getName()));
     }
 
     @Transactional(readOnly = true)

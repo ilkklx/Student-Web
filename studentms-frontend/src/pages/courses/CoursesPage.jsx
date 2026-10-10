@@ -81,10 +81,14 @@ export default function CoursesPage() {
   })
 
   const enrollMut = useMutation({
-    mutationFn: () => enrollStudent(Number(studentId), Number(panelCourseId)),
-    onSuccess: async () => {
+    mutationFn: ({ studentId: targetStudentId, courseId }) => {
+      if (!canEnroll) throw new Error('请从当前搜索结果选择学生和课程，等待数据加载完成。')
+      return enrollStudent(targetStudentId, courseId)
+    },
+    onSuccess: async (_data, variables) => {
       toast.success('Enrolled')
-      await qc.invalidateQueries({ queryKey: queryKeys.studentCourses(Number(studentId)) })
+      await qc.invalidateQueries({ queryKey: queryKeys.studentCourses(variables.studentId) })
+      await qc.invalidateQueries({ queryKey: ['enrollmentHistory', variables.studentId] })
       await qc.invalidateQueries({ queryKey: ['students'] })
       await qc.invalidateQueries({ queryKey: queryKeys.courses })
       await qc.invalidateQueries({ queryKey: queryKeys.dashboardStats })
@@ -115,6 +119,9 @@ export default function CoursesPage() {
   const slice = filtered.slice((pageSafe - 1) * pageSize, pageSafe * pageSize)
 
   const panelCourse = (coursesQuery.data || []).find((c) => String(c.id) === String(panelCourseId))
+  const canEnroll = !studentsQuery.isFetching && !studentsQuery.isError && !coursesQuery.isFetching
+    && !coursesQuery.isError && Boolean(panelCourse)
+    && (studentsQuery.data?.content || []).some(s => s.id === Number(studentId))
 
   if (coursesQuery.isPending || catalogQuery.isPending) {
     return (
@@ -288,7 +295,7 @@ export default function CoursesPage() {
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-sm font-semibold text-slate-900 dark:text-white">Enroll student</div>
-              <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">Select course, student, and grade.</div>
+              <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">选择课程和学生，成绩另行登记。</div>
             </div>
             <button
               type="button"
@@ -305,6 +312,7 @@ export default function CoursesPage() {
               <label className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">Course</label>
               <select
                 value={panelCourseId ?? ''}
+                disabled={enrollMut.isPending || coursesQuery.isFetching}
                 onChange={(e) => setPanelCourseId(e.target.value)}
                 className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-sky-500/40 dark:border-white/10 dark:bg-slate-950/40 dark:text-white dark:focus:ring-sky-500/40"
               >
@@ -329,7 +337,8 @@ export default function CoursesPage() {
               <label className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">Find student</label>
               <input
                 value={studentQ}
-                onChange={(e) => setStudentQ(e.target.value)}
+                disabled={enrollMut.isPending}
+                onChange={(e) => { setStudentQ(e.target.value); setStudentId('') }}
                 placeholder="Search by name…"
                 className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:ring-2 focus:ring-sky-500/40 dark:border-white/10 dark:bg-slate-950/40 dark:text-white dark:placeholder:text-slate-500 dark:focus:ring-sky-500/40"
               />
@@ -339,6 +348,7 @@ export default function CoursesPage() {
               <label className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">Student</label>
               <select
                 value={studentId}
+                disabled={enrollMut.isPending || studentsQuery.isFetching}
                 onChange={(e) => setStudentId(e.target.value)}
                 className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-sky-500/40 dark:border-white/10 dark:bg-slate-950/40 dark:text-white dark:focus:ring-sky-500/40"
               >
@@ -353,6 +363,10 @@ export default function CoursesPage() {
               </select>
             </div>
 
+            {studentsQuery.isError && <p role="alert" className="text-sm text-rose-600">{getApiErrorMessage(studentsQuery.error)}</p>}
+            {isTeacher && !studentQ && !studentsQuery.isFetching && !studentsQuery.isError && !studentsQuery.data?.content?.length
+              && <p className="text-xs text-slate-500">暂无本人课程的有效选课学生，请联系管理员登记首次选课。</p>}
+
             <div className="flex gap-2 pt-2">
               <button
                 type="button"
@@ -363,8 +377,8 @@ export default function CoursesPage() {
               </button>
               <button
                 type="button"
-                disabled={!studentId || !panelCourseId || enrollMut.isPending}
-                onClick={() => enrollMut.mutate()}
+                disabled={!canEnroll || enrollMut.isPending}
+                onClick={() => enrollMut.mutate({ studentId: Number(studentId), courseId: Number(panelCourseId) })}
                 className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-40 dark:bg-sky-600 dark:hover:bg-sky-500"
               >
                 <DocumentPlusIcon className="h-5 w-5" />

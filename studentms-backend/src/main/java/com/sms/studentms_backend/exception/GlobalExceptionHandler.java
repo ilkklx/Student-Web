@@ -59,6 +59,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGenericException(Exception ex, HttpServletRequest request) {
+        if (ex instanceof org.springframework.web.ErrorResponse frameworkError) {
+            org.springframework.http.HttpStatusCode status = frameworkError.getStatusCode();
+            return ResponseEntity.status(status).headers(frameworkError.getHeaders()).body(new ErrorResponse(
+                    LocalDateTime.now(), status.value(), "Request error", "Request could not be processed", request.getRequestURI()));
+        }
         ErrorResponse error = new ErrorResponse(
                 LocalDateTime.now(),
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
@@ -67,6 +72,13 @@ public class GlobalExceptionHandler {
                 request.getRequestURI()
         );
         return new ResponseEntity<>(error, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    @ExceptionHandler({org.springframework.http.converter.HttpMessageNotReadableException.class,
+            org.springframework.web.bind.MissingServletRequestParameterException.class,
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class})
+    public ResponseEntity<Map<String, String>> handleMalformedRequest(Exception ex) {
+        return ResponseEntity.badRequest().body(Map.of("message", "Invalid request body or parameters"));
     }
 
     @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)

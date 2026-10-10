@@ -29,6 +29,7 @@ export function AuthProvider({ children }) {
         clearSession()
         setToken(null)
         setIdentity(null)
+        setIsHydrating(false)
         qc.clear()
       }
     }).finally(() => { if (active) setIsHydrating(false) })

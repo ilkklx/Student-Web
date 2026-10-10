@@ -115,7 +115,7 @@ public class StudentController {
     }
 
     @GetMapping("/{studentId}/enrollments")
-    @PreAuthorize("hasRole('ADMIN') or @studentAccess.canRead(#studentId, authentication)")
+    @PreAuthorize("hasRole('ADMIN') or @studentAccess.canReadEnrollments(#studentId, authentication)")
     public List<EnrollmentDTO> getEnrollments(@PathVariable Long studentId) {
         return studentService.getEnrollmentsForStudent(studentId);
     }

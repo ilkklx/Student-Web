@@ -7,3 +7,5 @@ studentms-frontend/dist/
 studentms-frontend/.env.local
 studentms-frontend/.env.*.local
 studentms-backend/profile-pictures/
+__pycache__/
+*.py[cod]

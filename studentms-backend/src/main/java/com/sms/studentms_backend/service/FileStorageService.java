@@ -23,14 +23,20 @@ public class FileStorageService {
         if (file.isEmpty() || file.getSize() > 5L * 1024 * 1024) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "Upload a JPG or PNG image up to 5MB");
         }
+        byte[] bytes;
+        try { bytes = file.getBytes(); }
+        catch (IOException ex) { throw new IllegalStateException("Could not read uploaded image", ex); }
+        boolean png = bytes.length >= 8 && bytes[0] == (byte) 0x89 && bytes[1] == 'P' && bytes[2] == 'N' && bytes[3] == 'G';
+        boolean jpg = bytes.length >= 3 && bytes[0] == (byte) 0xff && bytes[1] == (byte) 0xd8 && bytes[2] == (byte) 0xff;
         try {
-            byte[] bytes = file.getBytes();
-            boolean png = bytes.length >= 8 && bytes[0] == (byte) 0x89 && bytes[1] == 'P' && bytes[2] == 'N' && bytes[3] == 'G';
-            boolean jpg = bytes.length >= 3 && bytes[0] == (byte) 0xff && bytes[1] == (byte) 0xd8 && bytes[2] == (byte) 0xff;
             if ((!png && !jpg) || ImageIO.read(new ByteArrayInputStream(bytes)) == null) {
                 throw new BusinessException(HttpStatus.BAD_REQUEST, "Upload a valid JPG or PNG image");
             }
-            String filename = "student-" + studentId + "-" + UUID.randomUUID() + (png ? ".png" : ".jpg");
+        } catch (IOException ex) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Upload a valid JPG or PNG image");
+        }
+        String filename = "student-" + studentId + "-" + UUID.randomUUID() + (png ? ".png" : ".jpg");
+        try {
             Files.write(directory.resolve(filename), bytes, StandardOpenOption.CREATE_NEW);
             return "/profile-pictures/" + filename;
         } catch (IOException ex) { throw new IllegalStateException("Could not store image", ex); }

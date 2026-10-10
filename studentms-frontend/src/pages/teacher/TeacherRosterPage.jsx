@@ -1,5 +1,5 @@
 import { ArrowPathIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import Spinner from '../../components/ui/Spinner'
 import StudentPhoto from '../../components/ui/StudentPhoto'
@@ -20,7 +20,7 @@ export default function TeacherRosterPage() {
     [page, size, sortBy, sortDir, name, department],
   )
 
-  const q = useQuery({ queryKey: queryKeys.students(params), queryFn: () => getStudents(params) })
+  const q = useQuery({ queryKey: queryKeys.students(params), queryFn: () => getStudents(params), placeholderData: keepPreviousData })
 
   const rows = q.data?.content || []
   const totalPages = q.data?.totalPages ?? 0
@@ -117,7 +117,7 @@ export default function TeacherRosterPage() {
       {/* Roster table */}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.02]">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-white/10">
+          <table aria-busy={q.isFetching} className="min-w-full divide-y divide-slate-200 text-sm dark:divide-white/10">
             <thead className="bg-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-700 dark:bg-black/20 dark:text-slate-400">
               <tr>
                 <th className="px-4 py-3">#</th>
@@ -173,7 +173,7 @@ export default function TeacherRosterPage() {
             </select>
             <button
               type="button"
-              disabled={pageNumber <= 0}
+              disabled={pageNumber <= 0 || q.isFetching}
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-30 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
             >
@@ -184,7 +184,7 @@ export default function TeacherRosterPage() {
             </div>
             <button
               type="button"
-              disabled={pageNumber + 1 >= totalPages}
+              disabled={pageNumber + 1 >= totalPages || q.isFetching}
               onClick={() => setPage((p) => p + 1)}
               className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-30 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
             >

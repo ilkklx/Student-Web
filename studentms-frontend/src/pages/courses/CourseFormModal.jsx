@@ -8,11 +8,12 @@ const schema = yup.object({
   title: yup.string().trim().required('Title is required'),
   credits: yup
     .number()
+    .transform((value, original) => original === '' ? null : value)
+    .nullable()
     .typeError('Credits must be a number')
     .integer()
     .min(1)
-    .max(30)
-    .required('Credits is required'),
+    .max(30),
 })
 
 export default function CourseFormModal({ open, onClose, onSubmit }) {
@@ -23,12 +24,12 @@ export default function CourseFormModal({ open, onClose, onSubmit }) {
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: yupResolver(schema),
-    defaultValues: { code: '', title: '', credits: 3 },
+    defaultValues: { code: '', title: '', credits: '' },
   })
 
   const submit = handleSubmit(async (values) => {
-    await onSubmit(values)
-    reset({ code: '', title: '', credits: 3 })
+    await onSubmit({ ...values, credits: values.credits ?? null })
+    reset({ code: '', title: '', credits: '' })
   })
 
   return (
@@ -58,25 +59,30 @@ export default function CourseFormModal({ open, onClose, onSubmit }) {
     >
       <form className="space-y-4" onSubmit={submit}>
         <div>
-          <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">Code</label>
+          <label htmlFor="course-code" className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">Code</label>
           <input
+            id="course-code"
             className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-sky-500/40 dark:border-white/10 dark:bg-slate-950/40 dark:text-white dark:focus:ring-sky-500/40"
             {...register('code')}
           />
           {errors.code && <p className="mt-1 text-xs text-rose-500 dark:text-rose-300">{errors.code.message}</p>}
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">Title</label>
+          <label htmlFor="course-title" className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">Title</label>
           <input
+            id="course-title"
             className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-sky-500/40 dark:border-white/10 dark:bg-slate-950/40 dark:text-white dark:focus:ring-sky-500/40"
             {...register('title')}
           />
           {errors.title && <p className="mt-1 text-xs text-rose-500 dark:text-rose-300">{errors.title.message}</p>}
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">Credits</label>
+          <label htmlFor="course-credits" className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">Credits（可选）</label>
           <input
+            id="course-credits"
             type="number"
+            min={1}
+            max={30}
             className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-sky-500/40 dark:border-white/10 dark:bg-slate-950/40 dark:text-white dark:focus:ring-sky-500/40"
             {...register('credits')}
           />

@@ -94,7 +94,7 @@ public class StudentService {
         student.setName(dto.getName().trim());
         student.setEmail(dto.getEmail().trim());
         student.setDepartment(dto.getDepartment() == null ? null : dto.getDepartment().trim());
-        if (dto.getStudentNumber() != null) student.setStudentNumber(dto.getStudentNumber());
+        if (dto.hasStudentNumber()) student.setStudentNumber(dto.getStudentNumber());
         student.setSchoolClass(schoolClassRepository.findByName(student.getDepartment() == null ? "" : student.getDepartment()).orElse(null));
         return convertToDTO(studentRepository.saveAndFlush(student));
     }
@@ -247,7 +247,7 @@ public class StudentService {
     }
 
     public void restoreStudent(Long id) {
-        Student student = studentRepository.findById(id).orElseThrow(() -> new StudentNotFoundException(id));
+        Student student = studentRepository.findForUpdate(id).orElseThrow(() -> new StudentNotFoundException(id));
         student.setDeleted(false);
         studentRepository.save(student);
     }

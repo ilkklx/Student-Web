@@ -3,8 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { toast } from 'react-toastify'
 import Spinner from '../../components/ui/Spinner'
+import StudentPhoto from '../../components/ui/StudentPhoto'
 import { useRole } from '../../hooks/useRole'
-import { absolutePhotoUrl } from '../../lib/assets'
 import { getApiErrorMessage } from '../../lib/errors'
 import { queryKeys } from '../../lib/queryKeys'
 import { getDeletedStudents, restoreStudent } from '../../lib/studentsApi'
@@ -188,7 +188,6 @@ export default function RecycleBinPage() {
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-white/10">
               {rows.map((s, idx) => {
-                const photo = absolutePhotoUrl(s.photoUrl)
                 return (
                   <tr key={s.id} className="hover:bg-slate-50 dark:hover:bg-white/[0.03]">
                     <td className="px-4 py-3">
@@ -197,8 +196,8 @@ export default function RecycleBinPage() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="relative h-10 w-10 overflow-hidden rounded-full ring-1 ring-slate-200 dark:ring-white/10">
-                          {photo ? (
-                            <img src={photo} alt="" className="h-full w-full object-cover" />
+                          {s.photoUrl ? (
+                            <StudentPhoto photoUrl={s.photoUrl} studentId={s.id} className="h-full w-full object-cover" />
                           ) : (
                             <div
                               className={`grid h-full w-full place-items-center text-xs font-bold text-white ${

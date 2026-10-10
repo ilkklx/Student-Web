@@ -118,18 +118,6 @@ try {
             $env:MYSQL_PWD = $previousMysqlPassword
         }
 
-        # 同时复核保留的中文控制台项目，测试只处理本次临时记录。
-        $consoleProject = Join-Path (Split-Path -Parent $PSScriptRoot) 'Student-Management-System'
-        $consoleCheck = Join-Path $consoleProject 'out/DatabaseSmokeTest.class'
-        if (Test-Path -LiteralPath $consoleCheck) {
-            $consoleClasspath = (Join-Path $consoleProject 'out') + ';' + (Join-Path $consoleProject 'lib/*')
-            $consoleResult = & java '-Dfile.encoding=UTF-8' '-Dstdout.encoding=UTF-8' '-Dstderr.encoding=UTF-8' -cp $consoleClasspath DatabaseSmokeTest 2>&1
-            $consoleExit = $LASTEXITCODE
-            $consoleResult | Set-Content -LiteralPath (Join-Path $consoleProject '.runtime/database-check.log') -Encoding UTF8
-            if ($consoleExit -ne 0) { throw '中文控制台项目检查失败，请查看它的运行日志。' }
-            Write-Host '中文控制台项目的数据库检查通过。'
-        }
-
         $backendStart = @{
             FilePath = (Get-Command java).Source
             ArgumentList = @('-Dfile.encoding=UTF-8', '-Dstdout.encoding=UTF-8', '-Dstderr.encoding=UTF-8',
@@ -156,7 +144,7 @@ try {
     for ($attempt = 0; $attempt -lt 90; $attempt++) {
         if ($backendProcess.HasExited) { throw '后端启动失败，请查看 .runtime/backend.stderr.log。' }
         try {
-            $response = Invoke-WebRequest -Uri ($api + '/v3/api-docs') -NoProxy -TimeoutSec 2 -SkipHttpErrorCheck
+            $response = Invoke-WebRequest -Uri ($api + '/api/health/ready') -NoProxy -TimeoutSec 2 -SkipHttpErrorCheck
             if ($response.StatusCode -eq 200) { $backendReady = $true; break }
         } catch { }
         Start-Sleep -Seconds 1

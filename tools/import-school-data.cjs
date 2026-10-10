@@ -7,16 +7,45 @@ const runtime = path.dirname(manifestFile);
 const source = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
 const reportFile = path.join(runtime, 'school-import-report.json');
 const previous = fs.existsSync(reportFile) ? JSON.parse(fs.readFileSync(reportFile, 'utf8')) : {};
-const report = { ...previous, startedAt: new Date().toISOString(), status: 'RUNNING', createdStudentIds: previous.createdStudentIds || [], createdCourseIds: previous.createdCourseIds || [], skippedStudents: 0, skippedCourses: 0 };
+const report = { ...previous, startedAt: new Date().toISOString(), completedAt: undefined, error: undefined, status: 'RUNNING', createdStudentIds: previous.createdStudentIds || [], createdCourseIds: previous.createdCourseIds || [], skippedStudents: 0, skippedCourses: 0 };
 const checkpoint = () => fs.writeFileSync(reportFile, JSON.stringify(report, null, 2), 'utf8');
+let writesStarted = false;
+const canonicalText = value => typeof value === 'string' && value.length > 0 && value === value.trim();
 
 (async () => {
   try {
+    assert(Array.isArray(source.students) && source.students.length > 0, '学生名单为空，未开始导入');
+    assert(Array.isArray(source.courses) && source.courses.length > 0, '课程列表为空，未开始导入');
+    assert(Array.isArray(source.unmatchedStudents), '名单缺少班级匹配核验结果');
     assert.equal(source.unmatchedStudents.length, 0, '存在未匹配课表的班级');
-    assert.equal(new Set(source.students.map(s => s.studentNumber)).size, source.students.length);
     for (const s of source.students) {
-      assert(/^\d{12}$/.test(s.studentNumber) && s.name.length >= 2 && s.name.length <= 100 && s.department, '名单字段不合法');
+      assert(typeof s.studentNumber === 'string' && /^\d{12}$/.test(s.studentNumber)
+        && canonicalText(s.name) && s.name.length >= 2 && s.name.length <= 100
+        && canonicalText(s.department) && s.department.length <= 255, '名单字段不合法，请使用规范字符串且不要带首尾空白');
     }
+    assert.equal(new Set(source.students.map(s => s.studentNumber)).size, source.students.length);
+    const sourceCourseCodes = new Set();
+    for (const course of source.courses) {
+      assert(canonicalText(course.code) && course.code.length <= 255 && canonicalText(course.title) && course.title.length <= 255, '课程字段不合法，请使用规范字符串且不要带首尾空白');
+      assert(!sourceCourseCodes.has(course.code), '源数据课程编号重复：' + course.code);
+      sourceCourseCodes.add(course.code);
+    }
+    // 源目录与课程引用必须在登录和任何写入前核验。
+    const catalog = process.argv[3]
+      ? JSON.parse(fs.readFileSync(process.argv[3], 'utf8'))
+      : source.catalog || JSON.parse(fs.readFileSync(path.join(__dirname, '../studentms-frontend/public/school-catalog.json'), 'utf8'));
+    assert(Array.isArray(catalog) && catalog.length > 0, '专业班级目录为空，未开始导入');
+    const classNames = new Set();
+    for (const major of catalog) {
+      assert(canonicalText(major.name) && major.name.length <= 255 && Array.isArray(major.classes) && major.classes.length > 0, '专业目录不合法');
+      for (const schoolClass of major.classes) {
+        assert(canonicalText(schoolClass.name) && schoolClass.name.length <= 255 && Array.isArray(schoolClass.courseCodes), '班级目录不合法');
+        assert(!classNames.has(schoolClass.name), '源目录班级重复：' + schoolClass.name);
+        classNames.add(schoolClass.name);
+        for (const code of schoolClass.courseCodes) assert(sourceCourseCodes.has(code), '班级引用源数据中不存在的课程：' + code);
+      }
+    }
+    for (const student of source.students) assert(classNames.has(student.department), '学生班级缺少课程目录：' + student.department);
     const login = await fetch(api + '/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: 'demo_admin', password: 'Demo12345!' }) });
     assert.equal(login.status, 200, '网页登录失败');
     const { token } = await login.json();
@@ -40,9 +69,18 @@ const checkpoint = () => fs.writeFileSync(reportFile, JSON.stringify(report, nul
     const existingStudents = await allStudents();
     const deletedStudents = await request('/students/deleted');
     const existingCourses = await request('/courses');
-    const byEmail = new Map([...existingStudents, ...deletedStudents].map(s => [s.email, s]));
+    const byEmail = new Map([...existingStudents, ...deletedStudents].map(s => [s.email.toLowerCase(), s]));
     const byNumber = new Map([...existingStudents, ...deletedStudents].filter(s => s.studentNumber).map(s => [String(s.studentNumber), s]));
-    const existingFor = s => byNumber.get(String(s.studentNumber)) || byEmail.get(s.studentNumber + '@lingnan');
+    const existingFor = s => {
+      const exact = byNumber.get(String(s.studentNumber));
+      if (exact) return exact;
+      const legacy = byEmail.get(s.studentNumber + '@lingnan');
+      if (legacy?.studentNumber && String(legacy.studentNumber) !== String(s.studentNumber)) {
+        throw new Error('学生身份冲突：邮箱 ' + s.studentNumber + '@lingnan 对应档案 ' + legacy.id
+          + ' 已保存不同学号，未开始导入，请管理员核对');
+      }
+      return legacy;
+    };
     const byCode = new Map(existingCourses.map(c => [c.code, c]));
     report.existingStudentDifferences = [];
     // 按学号匹配身份；记录资料差异，保留管理员已有修改。
@@ -53,7 +91,10 @@ const checkpoint = () => fs.writeFileSync(reportFile, JSON.stringify(report, nul
         if (fields.length) report.existingStudentDifferences.push({ studentId: existing.id, fields });
       }
     }
+    const currentCatalog = await request('/catalog');
+    const currentClasses = new Map(currentCatalog.flatMap(major => major.classes.map(c => [c.name, { ...c, major: major.name }])));
     const backupFile = path.join(runtime, 'school-import-before.json');
+    writesStarted = true;
     if (!fs.existsSync(backupFile)) fs.writeFileSync(backupFile, JSON.stringify({ students: existingStudents, deletedStudents, courses: existingCourses }, null, 2), 'utf8');
     checkpoint();
     let createdThisRun = 0;
@@ -63,7 +104,7 @@ const checkpoint = () => fs.writeFileSync(reportFile, JSON.stringify(report, nul
       const email = s.studentNumber + '@lingnan';
       if (existingFor(s)) { report.skippedStudents += 1; continue; }
       const created = await request('/students', 'POST', { name: s.name, email, department: s.department, studentNumber: s.studentNumber });
-      byEmail.set(email, created);
+      byEmail.set(email.toLowerCase(), created);
       byNumber.set(String(s.studentNumber), created);
       newStudentIds.add(created.id);
       report.createdStudentIds.push(created.id);
@@ -80,9 +121,6 @@ const checkpoint = () => fs.writeFileSync(reportFile, JSON.stringify(report, nul
       checkpoint();
     }
 
-    const catalog = JSON.parse(fs.readFileSync(process.argv[3] || path.join(__dirname, '../studentms-frontend/public/school-catalog.json'), 'utf8'));
-    const currentCatalog = await request('/catalog');
-    const currentClasses = new Map(currentCatalog.flatMap(major => major.classes.map(c => [c.name, { ...c, major: major.name }])));
     for (const major of catalog) {
       for (const schoolClass of major.classes) {
         const existingClass = currentClasses.get(schoolClass.name);
@@ -95,7 +133,7 @@ const checkpoint = () => fs.writeFileSync(reportFile, JSON.stringify(report, nul
     }
 
     const active = await allStudents();
-    const activeByEmail = new Map(active.map(s => [s.email, s]));
+    const activeByEmail = new Map(active.map(s => [s.email.toLowerCase(), s]));
     const activeByNumber = new Map(active.filter(s => s.studentNumber).map(s => [String(s.studentNumber), s]));
     let activeImportedStudents = 0;
     for (const s of source.students) {
@@ -128,7 +166,7 @@ const checkpoint = () => fs.writeFileSync(reportFile, JSON.stringify(report, nul
   } catch (e) {
     report.status = 'FAIL';
     report.error = e.message;
-    checkpoint();
+    if (writesStarted) checkpoint();
     console.error(e.message);
     process.exitCode = 1;
   }
