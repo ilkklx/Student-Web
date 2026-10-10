@@ -172,7 +172,7 @@ export default function CoursesPage() {
               <div className="mt-1 text-base font-semibold text-slate-900 dark:text-white">{c.title}</div>
               <div className="mt-3 inline-flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                 <ClockIcon className="h-4 w-4" />
-                <span>{c.credits} Credits</span>
+                <span>{c.credits == null ? '学分未提供' : `${c.credits} Credits`}</span>
               </div>
             </div>
           ))}
