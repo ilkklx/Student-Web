@@ -15,6 +15,7 @@ import { createCourse, getCourses } from '../../lib/coursesApi'
 import { queryKeys } from '../../lib/queryKeys'
 import { enrollStudent, getStudents } from '../../lib/studentsApi'
 import CourseFormModal from './CourseFormModal'
+import { useSearchParams } from 'react-router-dom'
 
 const swatches = [
   'bg-sky-500/20 text-sky-200',
@@ -29,6 +30,27 @@ export default function CoursesPage() {
   const [page, setPage] = useState(1)
   const pageSize = 6
   const [addOpen, setAddOpen] = useState(false)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const catalogQuery = useQuery({
+    queryKey: ['school-course-catalog'],
+    queryFn: async () => {
+      const response = await fetch('/school-catalog.json')
+      if (!response.ok) throw new Error('课程分类目录加载失败')
+      return response.json()
+    },
+  })
+  const catalog = catalogQuery.data || []
+  const selectedMajor = catalog.find(m => m.name === searchParams.get('major'))
+  const selectedClass = selectedMajor?.classes.find(c => c.name === searchParams.get('class'))
+  const showAll = searchParams.get('all') === '1'
+  const courseLevel = Boolean(selectedClass || showAll)
+  const itemLabel = courseLevel ? '课程' : selectedMajor ? '班级' : '专业'
+  const go = (major, className, all = false) => {
+    setSearchParams(all ? { all: '1' } : major ? { major, ...(className ? { class: className } : {}) } : {})
+    setQ('')
+    setPage(1)
+    setPanelOpen(false)
+  }
 
   const [panelOpen, setPanelOpen] = useState(false)
   const [panelCourseId, setPanelCourseId] = useState(null)
@@ -49,6 +71,7 @@ export default function CoursesPage() {
     onSuccess: async () => {
       toast.success('Course created')
       setAddOpen(false)
+      go(null, null, true)
       await qc.invalidateQueries({ queryKey: queryKeys.courses })
       await qc.invalidateQueries({ queryKey: queryKeys.dashboardStats })
     },
@@ -68,7 +91,12 @@ export default function CoursesPage() {
   })
 
   const filtered = useMemo(() => {
-    const list = coursesQuery.data || []
+    const allCourses = coursesQuery.data || []
+    const list = courseLevel
+      ? selectedClass ? allCourses.filter(c => selectedClass.courseCodes.includes(c.code)) : allCourses
+      : selectedMajor
+        ? selectedMajor.classes.map(c => ({ ...c, id: c.name, kind: 'class', title: c.name }))
+        : catalog.map(m => ({ ...m, id: m.name, kind: 'major', title: m.name }))
     const term = q.trim().toLowerCase()
     if (!term) return list
     return list.filter(
@@ -77,7 +105,7 @@ export default function CoursesPage() {
         c.code?.toLowerCase().includes(term) ||
         String(c.id).includes(term),
     )
-  }, [coursesQuery.data, q])
+  }, [coursesQuery.data, q, catalog, selectedMajor, selectedClass, courseLevel])
 
   const total = filtered.length
   const pages = Math.max(1, Math.ceil(total / pageSize))
@@ -86,7 +114,7 @@ export default function CoursesPage() {
 
   const panelCourse = (coursesQuery.data || []).find((c) => String(c.id) === String(panelCourseId))
 
-  if (coursesQuery.isPending) {
+  if (coursesQuery.isPending || catalogQuery.isPending) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
         <Spinner className="h-10 w-10" />
@@ -94,21 +122,21 @@ export default function CoursesPage() {
     )
   }
 
-  if (coursesQuery.isError) {
+  if (coursesQuery.isError || catalogQuery.isError) {
     return (
       <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-6 text-sm text-rose-100 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-100">
-        {getApiErrorMessage(coursesQuery.error)}
+        {getApiErrorMessage(coursesQuery.error || catalogQuery.error)}
       </div>
     )
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
+    <div className={`grid gap-6 ${panelOpen ? 'lg:grid-cols-[minmax(0,1fr)_340px]' : ''}`}>
       <div className="space-y-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Courses</h1>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Browse and manage all available courses.</p>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">按专业、班级浏览课表中的课程。</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
@@ -130,6 +158,14 @@ export default function CoursesPage() {
           </div>
         </div>
 
+        <nav aria-label="课程分类导航" className="flex flex-wrap items-center gap-2 text-sm">
+          <button type="button" onClick={() => go()} className="rounded-lg bg-indigo-100 px-3 py-2 font-semibold text-indigo-900 hover:bg-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-100">全部专业</button>
+          {selectedMajor && <><span className="text-slate-400">/</span><button type="button" onClick={() => go(selectedMajor.name)} className="rounded-lg px-3 py-2 font-semibold text-slate-900 hover:bg-slate-100 dark:text-white dark:hover:bg-white/10">{selectedMajor.name}</button></>}
+          {selectedClass && <><span className="text-slate-400">/</span><span className="px-3 py-2 font-semibold text-slate-900 dark:text-white">{selectedClass.name}</span></>}
+          {showAll && <><span className="text-slate-400">/</span><span className="px-3 py-2 font-semibold text-slate-900 dark:text-white">全部课程</span></>}
+          {!showAll && <button type="button" onClick={() => go(null, null, true)} className="ml-auto rounded-lg border border-slate-300 px-3 py-2 font-medium text-slate-700 hover:bg-slate-100 dark:border-white/20 dark:text-slate-200">全部课程</button>}
+        </nav>
+
         {/* Search bar */}
         <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.02]">
           <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-white/10 dark:bg-slate-950/40">
@@ -140,7 +176,7 @@ export default function CoursesPage() {
                 setQ(e.target.value)
                 setPage(1)
               }}
-              placeholder="Search courses…"
+              placeholder={`搜索${itemLabel}…`}
               className="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400 dark:text-white dark:placeholder:text-slate-500"
             />
           </div>
@@ -148,7 +184,20 @@ export default function CoursesPage() {
 
         {/* Course grid */}
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {slice.map((c, idx) => (
+          {slice.map((c, idx) => c.kind ? (
+            <button
+              type="button"
+              key={c.id}
+              data-testid={c.kind + '-card'}
+              onClick={() => c.kind === 'major' ? go(c.name) : go(selectedMajor.name, c.name)}
+              className="group rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-indigo-400 hover:shadow-md dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-indigo-400"
+            >
+              <div className="mb-5 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-200 font-bold text-indigo-950">{c.kind === 'major' ? '专业' : '班级'}</div>
+              <div className="text-lg font-semibold text-slate-950 dark:text-white">{c.title}</div>
+              <div className="mt-2 text-sm text-slate-600 dark:text-slate-300">{c.kind === 'major' ? `${c.classes.length} 个班级 · ${c.classes.reduce((n, x) => n + x.studentCount, 0)} 名学生` : `${c.studentCount} 名学生 · ${c.courseCodes.length} 门课程`}</div>
+              <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-3 text-sm font-semibold text-indigo-700 dark:border-white/10 dark:text-indigo-300"><span>{c.kind === 'major' ? '查看班级' : '查看课程'}</span><span aria-hidden="true">→</span></div>
+            </button>
+          ) : (
             <div
               key={c.id}
               className="rounded-2xl border border-slate-200 bg-white p-4 shadow-md dark:border-white/10 dark:bg-white/[0.03] dark:shadow-lg dark:shadow-black/15"
@@ -178,10 +227,12 @@ export default function CoursesPage() {
           ))}
         </div>
 
+        {total === 0 && <p role="status" className="rounded-2xl border border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300">没有匹配的{itemLabel}，请调整搜索内容。</p>}
+
         {/* Pagination */}
         <div className="flex flex-col gap-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between dark:text-slate-400">
           <div>
-            Showing {(pageSafe - 1) * pageSize + 1} to {Math.min(pageSafe * pageSize, total)} of {total} courses
+            共 {total} 项{itemLabel}，当前显示 {total ? (pageSafe - 1) * pageSize + 1 : 0}–{Math.min(pageSafe * pageSize, total)}
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -190,10 +241,10 @@ export default function CoursesPage() {
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-30 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
             >
-              Prev
+              上一页
             </button>
             <div className="text-xs text-slate-600 dark:text-slate-300">
-              Page {pageSafe} / {pages}
+              第 {pageSafe} / {pages} 页
             </div>
             <button
               type="button"
@@ -201,7 +252,7 @@ export default function CoursesPage() {
               onClick={() => setPage((p) => p + 1)}
               className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-30 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
             >
-              Next
+              下一页
             </button>
           </div>
         </div>
@@ -210,7 +261,7 @@ export default function CoursesPage() {
       {/* Enroll Panel (aside) */}
       <aside
         className={`${
-          panelOpen ? 'fixed inset-0 z-40 lg:static lg:inset-auto' : 'hidden lg:block'
+          panelOpen ? 'fixed inset-0 z-40 lg:static lg:inset-auto' : 'hidden'
         } lg:sticky lg:top-24 lg:self-start`}
       >
         {panelOpen ? (
@@ -234,8 +285,9 @@ export default function CoursesPage() {
             </div>
             <button
               type="button"
-              className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white lg:hidden"
+              className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white"
               onClick={() => setPanelOpen(false)}
+              aria-label="关闭选课面板"
             >
               <XMarkIcon className="h-5 w-5" />
             </button>

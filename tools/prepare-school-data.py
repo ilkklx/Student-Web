@@ -69,3 +69,24 @@ payload = {'students': matched, 'unmatchedStudents': unmatched, 'classes': class
 out.parent.mkdir(parents=True, exist_ok=True)
 out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding='utf-8')
 print(f'核对完成：{len(classes)} 个班级，{len(matched)} 名学生，{len(courses)} 门课程。')
+
+# 课程浏览目录只包含专业、班级和课程关系，不公开学生个人名单。
+catalog = []
+for major in sorted({s['major'] for s in matched}):
+    groups = []
+    for key in sorted({s['classKey'] for s in matched if s['major'] == major}):
+        class_students = [s for s in matched if s['classKey'] == key]
+        assert len({s['major'] for s in class_students}) == 1
+        assert len({s['department'] for s in class_students}) == 1
+        groups.append({
+            'name': class_students[0]['department'],
+            'studentCount': len(class_students),
+            'courseCodes': ['SPR26-' + hashlib.sha256(c.encode('utf-8')).hexdigest()[:10].upper() for c in classes[key]['courses']],
+        })
+    catalog.append({'name': re.sub(r'^\d{4}级', '', major), 'classes': groups})
+catalog_path = Path(__file__).resolve().parents[1] / 'studentms-frontend/public/school-catalog.json'
+catalog_path.write_text(json.dumps(catalog, ensure_ascii=False, indent=2), encoding='utf-8')
+dist_catalog = catalog_path.parent.parent / 'dist/school-catalog.json'
+if dist_catalog.parent.is_dir():
+    dist_catalog.write_text(json.dumps(catalog, ensure_ascii=False, indent=2), encoding='utf-8')
+print(f'课程目录已更新：{len(catalog)} 个专业，{sum(len(m["classes"]) for m in catalog)} 个班级。')

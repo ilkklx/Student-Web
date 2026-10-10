@@ -1,4 +1,4 @@
-import { BookOpenIcon, ClipboardDocumentListIcon, UserGroupIcon, UserIcon } from '@heroicons/react/24/outline'
+import { BookOpenIcon, UserGroupIcon } from '@heroicons/react/24/outline'
 import { useQuery } from '@tanstack/react-query'
 import { Navigate } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -32,17 +32,15 @@ export default function DashboardPage() {
   const cards = [
     { label: '学生总数', value: Intl.NumberFormat().format(data.totalStudents ?? 0), icon: UserGroupIcon, note: '当前有效学生记录' },
     { label: '课程总数', value: Intl.NumberFormat().format(data.totalCourses ?? 0), icon: BookOpenIcon, note: '已登记的课程' },
-    { label: '选课记录', value: Intl.NumberFormat().format(data.totalEnrollments ?? 0), icon: ClipboardDocumentListIcon, note: '已登记的个人选课' },
-    { label: '平均年龄', value: data.averageAge == null ? '未提供' : String(data.averageAge), icon: UserIcon, note: data.averageAge == null ? '尚无出生日期数据' : '依据已登记的出生日期' },
   ]
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Dashboard</h1>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">学生、课程与选课的实时概况。</p>
+        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">学生与课程的实时概况。</p>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2">
         {cards.map(c => (
           <div key={c.label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
             <div className="flex items-start justify-between gap-3">
@@ -68,12 +66,12 @@ export default function DashboardPage() {
         </div>
         {deptRows.length ? (
           <div className="overflow-x-auto">
-            <div className="min-w-[540px]" style={{ height: Math.max(280, deptRows.length * 32 + 40) }}>
+            <div className="min-w-[640px]" style={{ height: Math.max(280, deptRows.length * 38 + 40) }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={deptRows} layout="vertical" margin={{ top: 0, right: 35, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" horizontal={false} />
                   <XAxis type="number" allowDecimals={false} tick={{ fill: '#64748b', fontSize: 11 }} />
-                  <YAxis type="category" dataKey="name" width={190} interval={0} tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis type="category" dataKey="name" width={230} interval={0} tick={{ fill: '#0f172a', fontSize: 12 }} axisLine={false} tickLine={false} />
                   <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0' }} />
                   <Bar dataKey="value" name="人数" radius={[0, 5, 5, 0]} barSize={18}>
                     {deptRows.map((row, idx) => <Cell key={row.name} fill={['#6366f1', '#818cf8', '#38bdf8'][idx % 3]} />)}
@@ -83,9 +81,6 @@ export default function DashboardPage() {
             </div>
           </div>
         ) : <p className="py-12 text-center text-sm text-slate-500">暂无学生数据，请先添加或导入学生。</p>}
-      </div>
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm leading-relaxed text-slate-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-400">
-        学生名册与课程目录分别管理。个人选课和成绩需要单独登记，缺少的信息保持空白。
       </div>
     </div>
   )

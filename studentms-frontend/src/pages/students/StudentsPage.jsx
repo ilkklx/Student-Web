@@ -27,11 +27,11 @@ import {
 import StudentFormModal from './StudentFormModal'
 
 const deptColors = [
-  'bg-indigo-500/15 text-indigo-200 ring-indigo-500/25',
-  'bg-sky-500/15 text-sky-200 ring-sky-500/25',
-  'bg-emerald-500/15 text-emerald-200 ring-emerald-500/25',
-  'bg-amber-500/15 text-amber-200 ring-amber-500/25',
-  'bg-fuchsia-500/15 text-fuchsia-200 ring-fuchsia-500/25',
+  'bg-indigo-300 text-black ring-indigo-400 dark:bg-indigo-300 dark:text-black dark:ring-indigo-400',
+  'bg-sky-300 text-black ring-sky-400 dark:bg-sky-300 dark:text-black dark:ring-sky-400',
+  'bg-emerald-300 text-black ring-emerald-400 dark:bg-emerald-300 dark:text-black dark:ring-emerald-400',
+  'bg-amber-300 text-black ring-amber-400 dark:bg-amber-300 dark:text-black dark:ring-amber-400',
+  'bg-fuchsia-300 text-black ring-fuchsia-400 dark:bg-fuchsia-300 dark:text-black dark:ring-fuchsia-400',
 ]
 
 function deptClass(name) {
