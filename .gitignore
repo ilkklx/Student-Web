@@ -3,3 +3,7 @@
 studentms-backend/target/
 studentms-frontend/node_modules/
 studentms-frontend/dist/
+.vscode/
+studentms-frontend/.env.local
+studentms-frontend/.env.*.local
+studentms-backend/profile-pictures/
