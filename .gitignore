@@ -9,3 +9,9 @@ studentms-frontend/.env.*.local
 studentms-backend/profile-pictures/
 __pycache__/
 *.py[cod]
+*.xlsx
+*.xls
+*.csv
+*.sql
+!studentms-backend/src/main/resources/import.sql
+!studentms-backend/src/main/resources/local-roles.sql

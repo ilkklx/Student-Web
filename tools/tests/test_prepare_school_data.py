@@ -25,9 +25,12 @@ class PrepareSchoolDataTest(unittest.TestCase):
         self.output.write_text('previous manifest', encoding='utf-8')
         self.catalog.write_text('previous catalog', encoding='utf-8')
 
-    def run_prepare(self, courses=True):
+    def run_prepare(self, courses=True, explicit_catalog=True):
         sheet = SimpleNamespace(nrows=3, ncols=3, cell_value=lambda row, column: 'Java/周一' if courses and row == 2 and column == 2 else '')
-        with patch.object(sys, 'argv', [str(SCRIPT), str(self.output), '--schedule', str(self.schedule), '--rosters', str(self.rosters), '--catalog', str(self.catalog)]), \
+        arguments = [str(SCRIPT), str(self.output), '--schedule', str(self.schedule), '--rosters', str(self.rosters)]
+        if explicit_catalog:
+            arguments += ['--catalog', str(self.catalog)]
+        with patch.object(sys, 'argv', arguments), \
                 patch.object(xlrd, 'open_workbook', return_value=SimpleNamespace(sheets=lambda: [sheet])):
             runpy.run_path(str(SCRIPT), run_name='__main__')
 
@@ -41,11 +44,11 @@ class PrepareSchoolDataTest(unittest.TestCase):
             workbook.active.append([''] * 8)
             workbook.active.cell(5, 3, '202500000001')
             workbook.active.cell(5, 4, 'Test Student')
-            workbook.active.cell(5, 6, '2025级计算机科学与技术')
-            workbook.active.cell(5, 8, '2025级计科1班')
+            workbook.active.cell(5, 6, 'ExampleMajor')
+            workbook.active.cell(5, 8, 'ExampleClass1')
         workbook.save(self.rosters / 'roster.xlsx')
         workbook.close()
-        (self.schedule / '2025计科1班课表.xls').write_bytes(b'mocked workbook')
+        (self.schedule / 'ExampleClass1课表.xls').write_bytes(b'mocked workbook')
 
     def test_missing_directory_preserves_outputs(self):
         self.schedule = self.root / 'missing'
@@ -69,7 +72,7 @@ class PrepareSchoolDataTest(unittest.TestCase):
         workbook.active.cell(5, 1, 'Wrong format')
         workbook.save(self.rosters / 'narrow.xlsx')
         workbook.close()
-        (self.schedule / '2025计科1班课表.xls').write_bytes(b'mocked workbook')
+        (self.schedule / 'ExampleClass1课表.xls').write_bytes(b'mocked workbook')
         with self.assertRaisesRegex(ValueError, '名单列数不足：narrow.xlsx 第 5 行'):
             self.run_prepare()
         self.assert_unchanged()
@@ -98,6 +101,17 @@ class PrepareSchoolDataTest(unittest.TestCase):
         self.assertEqual(len(result['students']), 1)
         self.assertEqual(result['catalog'], json.loads(self.catalog.read_text(encoding='utf-8')))
         self.assertEqual(result['catalog'][0]['classes'][0]['courseCodes'], [result['courses'][0]['code']])
+
+    def test_default_catalog_stays_beside_private_manifest(self):
+        import json
+        self.roster()
+        public = SCRIPT.parents[1] / 'studentms-frontend/public/school-catalog.json'
+        before = public.read_bytes()
+        self.run_prepare(explicit_catalog=False)
+        generated = self.output.parent / 'school-catalog.json'
+        self.assertEqual(json.loads(self.output.read_text(encoding='utf-8'))['catalog'],
+                         json.loads(generated.read_text(encoding='utf-8')))
+        self.assertEqual(public.read_bytes(), before)
 
 
 if __name__ == '__main__':

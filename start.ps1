@@ -38,7 +38,17 @@ if (Test-Path -LiteralPath $statusFile) {
 # 修改源码后自动重新构建；依赖已保存在当前项目中。
 $backendInputs = @(Get-ChildItem -LiteralPath (Join-Path $backendDirectory 'src/main') -Recurse -File)
 $backendInputs += Get-Item -LiteralPath (Join-Path $backendDirectory 'pom.xml')
-if (-not (Test-Path -LiteralPath $backendJar) -or
+$backendRunnable = $false
+if (Test-Path -LiteralPath $backendJar) {
+    $jarArchive = $null
+    try {
+        $jarArchive = [System.IO.Compression.ZipFile]::OpenRead($backendJar)
+        $backendRunnable = $null -ne $jarArchive.GetEntry('org/springframework/boot/loader/launch/JarLauncher.class')
+    } catch { } finally {
+        if ($jarArchive) { $jarArchive.Dispose() }
+    }
+}
+if (-not $backendRunnable -or
     ($backendInputs | Where-Object { $_.LastWriteTimeUtc -gt (Get-Item -LiteralPath $backendJar).LastWriteTimeUtc })) {
     Write-Host '正在构建 Java 后端...'
     $previousJavaHome = $env:JAVA_HOME
@@ -72,6 +82,7 @@ $databasePassword = Read-Host 'MySQL 密码' -AsSecureString
 $previousUser = $env:DEMO_DB_USER
 $previousPassword = $env:DEMO_DB_PASSWORD
 $previousJwtSecret = $env:DEMO_JWT_SECRET
+$previousCatalogSeed = $env:DEMO_CATALOG_SEED
 $passwordPointer = [IntPtr]::Zero
 $backendProcess = $null
 $frontendProcess = $null
@@ -81,6 +92,8 @@ try {
         $env:DEMO_DB_USER = 'root'
         $env:DEMO_DB_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($passwordPointer)
         $env:DEMO_JWT_SECRET = [Guid]::NewGuid().ToString('N') + [Guid]::NewGuid().ToString('N')
+        $privateCatalog = Join-Path $runtimeDirectory 'school-catalog.json'
+        $env:DEMO_CATALOG_SEED = if (Test-Path -LiteralPath $privateCatalog) { $privateCatalog } else { '' }
 
         # 新版增加关系与约束；先备份已有练习库，再允许后端更新表结构。
         $mysqlService = Get-CimInstance Win32_Service | Where-Object { $_.Name -match '^MySQL' } | Select-Object -First 1
@@ -133,6 +146,7 @@ try {
         $env:DEMO_DB_USER = $previousUser
         $env:DEMO_DB_PASSWORD = $previousPassword
         $env:DEMO_JWT_SECRET = $previousJwtSecret
+        $env:DEMO_CATALOG_SEED = $previousCatalogSeed
         if ($passwordPointer -ne [IntPtr]::Zero) {
             [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($passwordPointer)
         }

@@ -33,7 +33,7 @@ const canonicalText = value => typeof value === 'string' && value.length > 0 && 
     // 源目录与课程引用必须在登录和任何写入前核验。
     const catalog = process.argv[3]
       ? JSON.parse(fs.readFileSync(process.argv[3], 'utf8'))
-      : source.catalog || JSON.parse(fs.readFileSync(path.join(__dirname, '../studentms-frontend/public/school-catalog.json'), 'utf8'));
+      : source.catalog || JSON.parse(fs.readFileSync(path.join(runtime, 'school-catalog.json'), 'utf8'));
     assert(Array.isArray(catalog) && catalog.length > 0, '专业班级目录为空，未开始导入');
     const classNames = new Set();
     for (const major of catalog) {

@@ -1,3 +1,7 @@
+param(
+    [string]$ScheduleDirectory = $env:STUDENT_WEB_SCHEDULE_DIR,
+    [string]$RosterDirectory = $env:STUDENT_WEB_ROSTER_DIR
+)
 $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath $PSScriptRoot
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
@@ -22,8 +26,17 @@ try {
 }
 
 $manifest = Join-Path $PSScriptRoot '.runtime/school-import-source.json'
+$settingsFile = Join-Path $PSScriptRoot '.runtime/import-settings.json'
+if (Test-Path -LiteralPath $settingsFile) {
+    $settings = Get-Content -LiteralPath $settingsFile -Raw -Encoding UTF8 | ConvertFrom-Json
+    if (-not $ScheduleDirectory) { $ScheduleDirectory = $settings.scheduleDirectory }
+    if (-not $RosterDirectory) { $RosterDirectory = $settings.rosterDirectory }
+}
+if (-not $ScheduleDirectory -or -not $RosterDirectory) {
+    throw '请通过 -ScheduleDirectory 和 -RosterDirectory 指定自己的课表与花名册目录；资料路径不写入公开源码。'
+}
 Write-Host '正在核对课表与学生名单...'
-& python -X utf8 (Join-Path $PSScriptRoot 'tools/prepare-school-data.py') $manifest
+& python -X utf8 (Join-Path $PSScriptRoot 'tools/prepare-school-data.py') $manifest --schedule $ScheduleDirectory --rosters $RosterDirectory
 if ($LASTEXITCODE -ne 0) { throw '课表与名单核对失败，未开始导入。' }
 & node (Join-Path $PSScriptRoot 'tools/import-school-data.cjs') $manifest
 if ($LASTEXITCODE -ne 0) { throw '导入失败：输入与身份预检错误见上方终端信息，旧报告保持不变；实际写入开始后的失败见 .runtime/school-import-report.json。修正问题后重试会跳过已有记录。' }

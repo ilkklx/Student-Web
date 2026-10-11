@@ -302,6 +302,11 @@ class BusinessFlowsIntegrationTest {
         initializer.run(new org.springframework.boot.DefaultApplicationArguments());
         assertEquals(1, users.findAll().stream().filter(u -> u.getUsername().equals("test_demo_admin")).count());
         var catalogInitializer = new com.sms.studentms_backend.config.CatalogInitializer(catalog, classes, courses, json);
+        var privateSeed = java.nio.file.Path.of("target/test-catalog/seed.json");
+        java.nio.file.Files.createDirectories(privateSeed.getParent());
+        java.nio.file.Files.writeString(privateSeed,
+                "[{\"name\":\"Example Major\",\"classes\":[{\"name\":\"Example Class\",\"courseCodes\":[\"CS101\"]}]}]");
+        org.springframework.test.util.ReflectionTestUtils.setField(catalogInitializer, "catalogSeed", privateSeed.toString());
         catalogInitializer.run(new org.springframework.boot.DefaultApplicationArguments());
         long count = classes.count();
         assertTrue(count > 0);

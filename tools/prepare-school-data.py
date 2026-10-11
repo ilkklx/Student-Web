@@ -4,14 +4,15 @@ import hashlib
 import json
 import re
 import argparse
+import os
 import openpyxl
 import xlrd
 
 parser = argparse.ArgumentParser(description='核对名单与课表后生成导入数据；输入缺失时不写文件。')
 parser.add_argument('output', type=Path)
-parser.add_argument('--schedule', type=Path, default=Path('F:/WX/xwechat_files/班级文件/大一/2026春季课表/班级课表(2025)'))
-parser.add_argument('--rosters', type=Path, default=Path('F:/WX/xwechat_files/班级文件/绩点/2026 综测/23-25级综测结果公示表（最终版）/2025级'))
-parser.add_argument('--catalog', type=Path, default=Path(__file__).resolve().parents[1] / 'studentms-frontend/public/school-catalog.json')
+parser.add_argument('--schedule', type=Path, default=os.environ.get('STUDENT_WEB_SCHEDULE_DIR'), required=not os.environ.get('STUDENT_WEB_SCHEDULE_DIR'))
+parser.add_argument('--rosters', type=Path, default=os.environ.get('STUDENT_WEB_ROSTER_DIR'), required=not os.environ.get('STUDENT_WEB_ROSTER_DIR'))
+parser.add_argument('--catalog', type=Path, default=None)
 args = parser.parse_args()
 schedule, rosters, out = args.schedule, args.rosters, args.output
 
@@ -112,7 +113,7 @@ payload = {'students': matched, 'unmatchedStudents': unmatched, 'classes': class
 out.parent.mkdir(parents=True, exist_ok=True)
 out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding='utf-8')
 print(f'核对完成：{len(classes)} 个班级，{len(matched)} 名学生，{len(courses)} 门课程。')
-catalog_path = args.catalog
+catalog_path = args.catalog or out.parent / 'school-catalog.json'
 catalog_path.parent.mkdir(parents=True, exist_ok=True)
 catalog_path.write_text(json.dumps(catalog, ensure_ascii=False, indent=2), encoding='utf-8')
 print(f'课程目录已更新：{len(catalog)} 个专业，{sum(len(m["classes"]) for m in catalog)} 个班级。')

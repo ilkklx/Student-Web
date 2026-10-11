@@ -7,6 +7,9 @@ import com.sms.studentms_backend.service.CatalogService;
 import org.springframework.boot.*;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.beans.factory.annotation.Value;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 
@@ -17,6 +20,8 @@ public class CatalogInitializer implements ApplicationRunner {
     private final SchoolClassRepository classes;
     private final CourseRepository courses;
     private final ObjectMapper mapper;
+    @Value("${app.catalog-seed:}")
+    private String catalogSeed = "";
 
     public CatalogInitializer(CatalogService catalog, SchoolClassRepository classes, CourseRepository courses, ObjectMapper mapper) {
         this.catalog = catalog; this.classes = classes; this.courses = courses; this.mapper = mapper;
@@ -24,7 +29,9 @@ public class CatalogInitializer implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) throws Exception {
-        try (var input = new ClassPathResource("school-catalog-seed.json").getInputStream()) {
+        try (var input = catalogSeed.isBlank()
+                ? new ClassPathResource("school-catalog-seed.json").getInputStream()
+                : Files.newInputStream(Path.of(catalogSeed))) {
             for (var major : mapper.readTree(input)) {
                 for (var schoolClass : major.path("classes")) {
                     if (classes.findByName(schoolClass.path("name").asText()).isPresent()) continue;
